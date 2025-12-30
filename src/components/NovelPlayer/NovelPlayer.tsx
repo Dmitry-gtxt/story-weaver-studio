@@ -216,6 +216,17 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     }
   };
 
+  // Найти первый текстовый нод (dialogue, narration, choice)
+  const findFirstTextNodeIndex = useCallback((scene: Scene): number => {
+    for (let i = 0; i < scene.nodes.length; i++) {
+      const node = scene.nodes[i];
+      if (node.type === 'dialogue' || node.type === 'narration' || node.type === 'choice') {
+        return i;
+      }
+    }
+    return -1; // Нет текстовых нодов
+  }, []);
+
   // Не обрабатывать начальные узлы при загрузке сохранения
   useEffect(() => {
     if (isLoading) return;
@@ -241,8 +252,11 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
           break;
         }
       }
-      if (idx > 0) {
+      if (idx > 0 && idx < currentScene.nodes.length) {
         setCurrentNodeIndex(idx);
+      } else if (idx >= currentScene.nodes.length) {
+        // Все ноды служебные — устанавливаем индекс на последний
+        setCurrentNodeIndex(currentScene.nodes.length - 1);
       }
     }
   }, [currentSceneId, isLoading]);
@@ -308,13 +322,29 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     }
   };
 
-  if (!currentScene || !currentNode) {
+  if (!currentScene) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <p className="text-muted-foreground">Сцена не найдена</p>
       </div>
     );
   }
+
+  // Проверка, есть ли текстовые ноды в сцене
+  const hasTextNodes = currentScene.nodes.some(n => 
+    n.type === 'dialogue' || n.type === 'narration' || n.type === 'choice'
+  );
+
+  if (!hasTextNodes) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <p className="text-muted-foreground">Сцена пуста — добавьте диалоги или нарратив в редакторе</p>
+      </div>
+    );
+  }
+
+  // Если currentNode не найден (все ноды обработаны), показать последний служебный
+  const nodeToRender = currentNode || currentScene.nodes[currentScene.nodes.length - 1];
 
   const isLastNode = currentNodeIndex === currentScene.nodes.length - 1;
   const isChoiceNode = currentNode.type === 'choice';
