@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { Novel, Scene, SceneNode, UUID } from '@/types/novel';
+import { Novel, Scene, SceneNode, UUID, Character, CharacterSprite } from '@/types/novel';
 import { mockNovel } from '@/data/mockNovel';
 import { ScenesList } from '@/components/Editor/ScenesList';
 import { NodeEditor } from '@/components/Editor/NodeEditor';
+import { CharacterEditor } from '@/components/Editor/CharacterEditor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Play } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Play, Film, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+type EditorTab = 'scenes' | 'characters';
 
 const Editor = () => {
   const [novel, setNovel] = useState<Novel>(mockNovel);
+  const [activeTab, setActiveTab] = useState<EditorTab>('scenes');
   const [selectedSceneId, setSelectedSceneId] = useState<UUID | null>(
     novel.chapters[0]?.scenes[0]?.id || null
   );
@@ -140,6 +145,56 @@ const Editor = () => {
     }));
   };
 
+  // Добавить персонажа
+  const handleAddCharacter = (character: Character) => {
+    setNovel(prev => ({
+      ...prev,
+      characters: [...prev.characters, character],
+    }));
+  };
+
+  // Обновить персонажа
+  const handleUpdateCharacter = (characterId: UUID, updates: Partial<Character>) => {
+    setNovel(prev => ({
+      ...prev,
+      characters: prev.characters.map(c =>
+        c.id === characterId ? { ...c, ...updates } : c
+      ),
+    }));
+  };
+
+  // Удалить персонажа
+  const handleDeleteCharacter = (characterId: UUID) => {
+    setNovel(prev => ({
+      ...prev,
+      characters: prev.characters.filter(c => c.id !== characterId),
+    }));
+  };
+
+  // Добавить спрайт персонажу
+  const handleAddSprite = (characterId: UUID, sprite: CharacterSprite) => {
+    setNovel(prev => ({
+      ...prev,
+      characters: prev.characters.map(c =>
+        c.id === characterId
+          ? { ...c, sprites: [...c.sprites, sprite] }
+          : c
+      ),
+    }));
+  };
+
+  // Удалить спрайт
+  const handleDeleteSprite = (characterId: UUID, spriteId: UUID) => {
+    setNovel(prev => ({
+      ...prev,
+      characters: prev.characters.map(c =>
+        c.id === characterId
+          ? { ...c, sprites: c.sprites.filter(s => s.id !== spriteId) }
+          : c
+      ),
+    }));
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Заголовок */}
@@ -153,39 +208,69 @@ const Editor = () => {
           </Link>
           <h1 className="text-lg font-semibold">{novel.title} — Редактор</h1>
         </div>
-        <Link to="/">
-          <Button size="sm">
-            <Play className="h-4 w-4 mr-2" />
-            Запустить
-          </Button>
-        </Link>
+        
+        <div className="flex items-center gap-4">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EditorTab)}>
+            <TabsList>
+              <TabsTrigger value="scenes" className="gap-2">
+                <Film className="h-4 w-4" />
+                Сцены
+              </TabsTrigger>
+              <TabsTrigger value="characters" className="gap-2">
+                <Users className="h-4 w-4" />
+                Персонажи
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <Link to="/">
+            <Button size="sm">
+              <Play className="h-4 w-4 mr-2" />
+              Запустить
+            </Button>
+          </Link>
+        </div>
       </header>
 
       {/* Основная область */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Левая панель — список сцен */}
-        <ScenesList
-          chapters={novel.chapters}
-          selectedSceneId={selectedSceneId}
-          onSelectScene={setSelectedSceneId}
-          onAddScene={handleAddScene}
-          onDeleteScene={handleDeleteScene}
-          onRenameScene={handleRenameScene}
-        />
+        {activeTab === 'scenes' ? (
+          <>
+            {/* Левая панель — список сцен */}
+            <ScenesList
+              chapters={novel.chapters}
+              selectedSceneId={selectedSceneId}
+              onSelectScene={setSelectedSceneId}
+              onAddScene={handleAddScene}
+              onDeleteScene={handleDeleteScene}
+              onRenameScene={handleRenameScene}
+            />
 
-        {/* Правая панель — редактор узлов */}
-        <NodeEditor
-          scene={selectedScene}
-          allScenes={allScenes}
-          characters={novel.characters}
-          backgrounds={novel.backgrounds}
-          audioAssets={novel.audio}
-          onAddNode={(node) => selectedSceneId && handleAddNode(selectedSceneId, node)}
-          onDeleteNode={(nodeId) => selectedSceneId && handleDeleteNode(selectedSceneId, nodeId)}
-          onUpdateNode={(nodeId, updates) => selectedSceneId && handleUpdateNode(selectedSceneId, nodeId, updates)}
-          onReorderNodes={(from, to) => selectedSceneId && handleReorderNodes(selectedSceneId, from, to)}
-          generateId={generateId}
-        />
+            {/* Правая панель — редактор узлов */}
+            <NodeEditor
+              scene={selectedScene}
+              allScenes={allScenes}
+              characters={novel.characters}
+              backgrounds={novel.backgrounds}
+              audioAssets={novel.audio}
+              onAddNode={(node) => selectedSceneId && handleAddNode(selectedSceneId, node)}
+              onDeleteNode={(nodeId) => selectedSceneId && handleDeleteNode(selectedSceneId, nodeId)}
+              onUpdateNode={(nodeId, updates) => selectedSceneId && handleUpdateNode(selectedSceneId, nodeId, updates)}
+              onReorderNodes={(from, to) => selectedSceneId && handleReorderNodes(selectedSceneId, from, to)}
+              generateId={generateId}
+            />
+          </>
+        ) : (
+          <CharacterEditor
+            characters={novel.characters}
+            onAddCharacter={handleAddCharacter}
+            onUpdateCharacter={handleUpdateCharacter}
+            onDeleteCharacter={handleDeleteCharacter}
+            onAddSprite={handleAddSprite}
+            onDeleteSprite={handleDeleteSprite}
+            generateId={generateId}
+          />
+        )}
       </div>
     </div>
   );
