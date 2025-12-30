@@ -21,9 +21,19 @@ const Play = () => {
       }
 
       try {
+        console.log('Loading novel:', novelId);
         const loadedNovel = await loadNovelFromDb(novelId);
+        console.log('Loaded novel:', loadedNovel);
+        console.log('Chapters:', loadedNovel?.chapters);
+        console.log('First scene:', loadedNovel?.chapters?.[0]?.scenes?.[0]);
+        console.log('Start scene ID:', loadedNovel?.startSceneId);
+        
         if (loadedNovel) {
-          setNovel(loadedNovel);
+          if (!loadedNovel.startSceneId || loadedNovel.chapters.length === 0) {
+            setError('Новелла пуста — добавьте сцены в редакторе');
+          } else {
+            setNovel(loadedNovel);
+          }
         } else {
           setError('Новелла не найдена или недоступна');
         }
