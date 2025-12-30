@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode } from '@/types/novel';
+import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 
@@ -43,7 +43,6 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters(prev => {
       switch (action) {
         case 'enter':
-          // Добавить персонажа если его нет
           if (prev.find(c => c.characterId === characterId)) {
             return prev.map(c => 
               c.characterId === characterId 
@@ -77,20 +76,21 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
       const nextIndex = currentNodeIndex + 1;
       const nextNode = currentScene.nodes[nextIndex];
       
-      // Если следующий узел - character, обработать и пропустить
       if (nextNode.type === 'character') {
         processCharacterNode(nextNode as CharacterNode);
         setCurrentNodeIndex(nextIndex);
-        // Рекурсивно проверяем следующий
         setTimeout(() => handleNext(), 50);
       } else {
         setCurrentNodeIndex(nextIndex);
       }
-    } else {
-      // Конец сцены - сброс
-      setCurrentNodeIndex(0);
-      setOnScreenCharacters([]);
     }
+  };
+
+  // Переход на другую сцену по выбору
+  const handleChoice = (targetSceneId: string) => {
+    setCurrentSceneId(targetSceneId);
+    setCurrentNodeIndex(0);
+    setOnScreenCharacters([]);
   };
 
   // Обработать начальные узлы типа character
@@ -135,6 +135,31 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
           </p>
         );
       }
+      case 'choice': {
+        const choiceNode = node as ChoiceNode;
+        return (
+          <div className="space-y-4">
+            {choiceNode.prompt && (
+              <p className="text-lg text-center font-medium">{choiceNode.prompt}</p>
+            )}
+            <div className="flex flex-col gap-3">
+              {choiceNode.options.map((option) => (
+                <Button
+                  key={option.id}
+                  variant="outline"
+                  className="w-full py-6 text-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleChoice(option.targetSceneId);
+                  }}
+                >
+                  {option.text}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
       default:
         return <p className="text-muted-foreground">[ {node.type} ]</p>;
     }
@@ -149,6 +174,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   }
 
   const isLastNode = currentNodeIndex === currentScene.nodes.length - 1;
+  const isChoiceNode = currentNode.type === 'choice';
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
@@ -236,30 +262,37 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
       <div className="absolute bottom-0 left-0 right-0 p-4">
         <div 
           className="relative mx-auto max-w-4xl rounded-lg border border-border/50 bg-background/95 backdrop-blur-sm p-6 shadow-2xl cursor-pointer"
-          onClick={handleNext}
+          onClick={!isChoiceNode ? handleNext : undefined}
         >
           {/* Контент */}
           <div className="min-h-[100px]">
             {renderNode(currentNode)}
           </div>
 
-          {/* Кнопка "Далее" */}
-          <div className="absolute bottom-4 right-4 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {currentNodeIndex + 1} / {currentScene.nodes.length}
-            </span>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNext();
-              }}
-            >
-              {isLastNode ? 'Начать сначала' : 'Далее'}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
+          {/* Кнопка "Далее" - скрыта при выборе */}
+          {!isChoiceNode && (
+            <div className="absolute bottom-4 right-4 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {currentNodeIndex + 1} / {currentScene.nodes.length}
+              </span>
+              {!isLastNode && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                >
+                  Далее
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
+              {isLastNode && (
+                <span className="text-sm text-muted-foreground">— Конец —</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
