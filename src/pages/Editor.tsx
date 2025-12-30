@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Novel, Scene, SceneNode, UUID, Character, CharacterSprite } from '@/types/novel';
+import { Novel, Scene, SceneNode, UUID, Character, CharacterSprite, Background, AudioAsset } from '@/types/novel';
 import { mockNovel } from '@/data/mockNovel';
 import { ScenesList } from '@/components/Editor/ScenesList';
 import { NodeEditor } from '@/components/Editor/NodeEditor';
 import { CharacterEditor } from '@/components/Editor/CharacterEditor';
+import { AssetsEditor } from '@/components/Editor/AssetsEditor';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Play, Film, Users } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Play, Film, Users, FolderOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-type EditorTab = 'scenes' | 'characters';
+type EditorTab = 'scenes' | 'characters' | 'assets';
 
 const Editor = () => {
   const [novel, setNovel] = useState<Novel>(mockNovel);
@@ -195,6 +196,58 @@ const Editor = () => {
     }));
   };
 
+  // Добавить фон
+  const handleAddBackground = (bg: Background) => {
+    setNovel(prev => ({
+      ...prev,
+      backgrounds: [...prev.backgrounds, bg],
+    }));
+  };
+
+  // Обновить фон
+  const handleUpdateBackground = (bgId: UUID, updates: Partial<Background>) => {
+    setNovel(prev => ({
+      ...prev,
+      backgrounds: prev.backgrounds.map(b =>
+        b.id === bgId ? { ...b, ...updates } : b
+      ),
+    }));
+  };
+
+  // Удалить фон
+  const handleDeleteBackground = (bgId: UUID) => {
+    setNovel(prev => ({
+      ...prev,
+      backgrounds: prev.backgrounds.filter(b => b.id !== bgId),
+    }));
+  };
+
+  // Добавить аудио
+  const handleAddAudio = (audio: AudioAsset) => {
+    setNovel(prev => ({
+      ...prev,
+      audio: [...prev.audio, audio],
+    }));
+  };
+
+  // Обновить аудио
+  const handleUpdateAudio = (audioId: UUID, updates: Partial<AudioAsset>) => {
+    setNovel(prev => ({
+      ...prev,
+      audio: prev.audio.map(a =>
+        a.id === audioId ? { ...a, ...updates } : a
+      ),
+    }));
+  };
+
+  // Удалить аудио
+  const handleDeleteAudio = (audioId: UUID) => {
+    setNovel(prev => ({
+      ...prev,
+      audio: prev.audio.filter(a => a.id !== audioId),
+    }));
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Заголовок */}
@@ -219,6 +272,10 @@ const Editor = () => {
               <TabsTrigger value="characters" className="gap-2">
                 <Users className="h-4 w-4" />
                 Персонажи
+              </TabsTrigger>
+              <TabsTrigger value="assets" className="gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Ассеты
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -260,7 +317,7 @@ const Editor = () => {
               generateId={generateId}
             />
           </>
-        ) : (
+        ) : activeTab === 'characters' ? (
           <CharacterEditor
             characters={novel.characters}
             onAddCharacter={handleAddCharacter}
@@ -268,6 +325,18 @@ const Editor = () => {
             onDeleteCharacter={handleDeleteCharacter}
             onAddSprite={handleAddSprite}
             onDeleteSprite={handleDeleteSprite}
+            generateId={generateId}
+          />
+        ) : (
+          <AssetsEditor
+            backgrounds={novel.backgrounds}
+            audioAssets={novel.audio}
+            onAddBackground={handleAddBackground}
+            onUpdateBackground={handleUpdateBackground}
+            onDeleteBackground={handleDeleteBackground}
+            onAddAudio={handleAddAudio}
+            onUpdateAudio={handleUpdateAudio}
+            onDeleteAudio={handleDeleteAudio}
             generateId={generateId}
           />
         )}
