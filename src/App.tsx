@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Editor from "./pages/Editor";
 import Auth from "./pages/Auth";
 import NovelsList from "./pages/NovelsList";
+import Play from "./pages/Play";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/novels" element={<NovelsList />} />
             <Route path="/editor/:novelId" element={<Editor />} />
+            <Route path="/play/:novelId" element={<Play />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
