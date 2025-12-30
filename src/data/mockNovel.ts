@@ -43,6 +43,15 @@ export const mockNovel: Novel = {
           id: 'scene-1',
           name: 'Встреча',
           nodes: [
+            // Алиса появляется в центре
+            {
+              id: 'node-0',
+              type: 'character',
+              characterId: 'char-1',
+              action: 'enter',
+              position: 'center',
+              emotion: 'neutral',
+            },
             {
               id: 'node-1',
               type: 'narration',
@@ -60,6 +69,23 @@ export const mockNovel: Novel = {
               type: 'narration',
               text: 'В дверь постучали.',
             },
+            // Боб появляется справа
+            {
+              id: 'node-3b',
+              type: 'character',
+              characterId: 'char-2',
+              action: 'enter',
+              position: 'right',
+              emotion: 'neutral',
+            },
+            // Алиса двигается влево
+            {
+              id: 'node-3c',
+              type: 'character',
+              characterId: 'char-1',
+              action: 'move',
+              position: 'left',
+            },
             {
               id: 'node-4',
               type: 'dialogue',
@@ -73,6 +99,13 @@ export const mockNovel: Novel = {
               characterId: 'char-1',
               emotion: 'happy',
               text: 'Уже иду, Боб!',
+            },
+            // Боб уходит
+            {
+              id: 'node-5b',
+              type: 'character',
+              characterId: 'char-2',
+              action: 'exit',
             },
             {
               id: 'node-6',
