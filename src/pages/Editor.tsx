@@ -295,6 +295,22 @@ const Editor = () => {
     }
   };
 
+  const handleUpdateSprite = async (characterId: UUID, spriteId: UUID, updates: Partial<CharacterSprite>) => {
+    const success = await api.updateSprite(spriteId, updates);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        characters: prev.characters.map(c =>
+          c.id === characterId 
+            ? { ...c, sprites: c.sprites.map(s => s.id === spriteId ? { ...s, ...updates } : s) } 
+            : c
+        ),
+      } : null);
+    }
+    return success;
+  };
+
   // === ФОНЫ ===
   const handleAddBackground = async (bg: Background) => {
     if (!novelId) return;
@@ -466,6 +482,7 @@ const Editor = () => {
             onDeleteCharacter={handleDeleteCharacter}
             onAddSprite={handleAddSprite}
             onDeleteSprite={handleDeleteSprite}
+            onUpdateSprite={handleUpdateSprite}
             generateId={generateId}
             userId={user?.id || ''}
           />
