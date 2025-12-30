@@ -13,7 +13,8 @@ import {
   Palette, 
   ImagePlus,
   X,
-  Smile
+  Smile,
+  Loader2
 } from 'lucide-react';
 import {
   Dialog,
@@ -22,6 +23,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { uploadFile } from '@/lib/storage';
+import { toast } from '@/hooks/use-toast';
 
 interface CharacterEditorProps {
   characters: Character[];
@@ -31,6 +34,7 @@ interface CharacterEditorProps {
   onAddSprite: (characterId: UUID, sprite: CharacterSprite) => void;
   onDeleteSprite: (characterId: UUID, spriteId: UUID) => void;
   generateId: () => UUID;
+  userId: string;
 }
 
 export const CharacterEditor = ({
@@ -41,7 +45,9 @@ export const CharacterEditor = ({
   onAddSprite,
   onDeleteSprite,
   generateId,
+  userId,
 }: CharacterEditorProps) => {
+  const [uploadingSprite, setUploadingSprite] = useState<UUID | null>(null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<UUID | null>(
     characters[0]?.id || null
   );
@@ -76,19 +82,27 @@ export const CharacterEditor = ({
     setNewEmotionUrl('');
   };
 
-  const handleImageUpload = (characterId: UUID, spriteId: UUID, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageUrl = e.target?.result as string;
-      const character = characters.find(c => c.id === characterId);
-      if (character) {
-        const updatedSprites = character.sprites.map(s =>
-          s.id === spriteId ? { ...s, imageUrl } : s
-        );
-        onUpdateCharacter(characterId, { sprites: updatedSprites });
+  const handleImageUpload = async (characterId: UUID, spriteId: UUID, file: File) => {
+    setUploadingSprite(spriteId);
+    try {
+      const imageUrl = await uploadFile(userId, file, 'image');
+      if (imageUrl) {
+        const character = characters.find(c => c.id === characterId);
+        if (character) {
+          const updatedSprites = character.sprites.map(s =>
+            s.id === spriteId ? { ...s, imageUrl } : s
+          );
+          onUpdateCharacter(characterId, { sprites: updatedSprites });
+          toast({ title: 'Изображение загружено' });
+        }
+      } else {
+        toast({ title: 'Ошибка загрузки', variant: 'destructive' });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      toast({ title: 'Ошибка загрузки', variant: 'destructive' });
+    } finally {
+      setUploadingSprite(null);
+    }
   };
 
   return (
@@ -230,22 +244,28 @@ export const CharacterEditor = ({
                       
                       {/* Кнопки управления */}
                       <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleImageUpload(selectedCharacter.id, sprite.id, file);
-                              }
-                            }}
-                          />
-                          <div className="p-1 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-                            <ImagePlus className="h-3 w-3" />
+                        {uploadingSprite === sprite.id ? (
+                          <div className="p-1 bg-primary text-primary-foreground rounded-md">
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           </div>
-                        </label>
+                        ) : (
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleImageUpload(selectedCharacter.id, sprite.id, file);
+                                }
+                              }}
+                            />
+                            <div className="p-1 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                              <ImagePlus className="h-3 w-3" />
+                            </div>
+                          </label>
+                        )}
                         <button
                           className="p-1 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
                           onClick={() => onDeleteSprite(selectedCharacter.id, sprite.id)}
