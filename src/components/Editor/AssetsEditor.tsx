@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Background, AudioAsset, UUID } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,9 +16,11 @@ import {
   Pause,
   Edit2,
   Check,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
-import { useRef } from 'react';
+import { uploadFile } from '@/lib/storage';
+import { toast } from '@/hooks/use-toast';
 
 interface AssetsEditorProps {
   backgrounds: Background[];
@@ -31,6 +32,7 @@ interface AssetsEditorProps {
   onUpdateAudio: (id: UUID, updates: Partial<AudioAsset>) => void;
   onDeleteAudio: (id: UUID) => void;
   generateId: () => UUID;
+  userId: string;
 }
 
 export const AssetsEditor = ({
@@ -43,10 +45,12 @@ export const AssetsEditor = ({
   onUpdateAudio,
   onDeleteAudio,
   generateId,
+  userId,
 }: AssetsEditorProps) => {
   const [editingId, setEditingId] = useState<UUID | null>(null);
   const [editingName, setEditingName] = useState('');
   const [playingAudioId, setPlayingAudioId] = useState<UUID | null>(null);
+  const [uploadingId, setUploadingId] = useState<UUID | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleAddBackground = () => {
@@ -68,22 +72,38 @@ export const AssetsEditor = ({
     onAddAudio(newAudio);
   };
 
-  const handleImageUpload = (bgId: UUID, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageUrl = e.target?.result as string;
-      onUpdateBackground(bgId, { imageUrl });
-    };
-    reader.readAsDataURL(file);
+  const handleImageUpload = async (bgId: UUID, file: File) => {
+    setUploadingId(bgId);
+    try {
+      const imageUrl = await uploadFile(userId, file, 'image');
+      if (imageUrl) {
+        onUpdateBackground(bgId, { imageUrl });
+        toast({ title: 'Изображение загружено' });
+      } else {
+        toast({ title: 'Ошибка загрузки', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка загрузки', variant: 'destructive' });
+    } finally {
+      setUploadingId(null);
+    }
   };
 
-  const handleAudioUpload = (audioId: UUID, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const audioUrl = e.target?.result as string;
-      onUpdateAudio(audioId, { audioUrl });
-    };
-    reader.readAsDataURL(file);
+  const handleAudioUpload = async (audioId: UUID, file: File) => {
+    setUploadingId(audioId);
+    try {
+      const audioUrl = await uploadFile(userId, file, 'audio');
+      if (audioUrl) {
+        onUpdateAudio(audioId, { audioUrl });
+        toast({ title: 'Аудио загружено' });
+      } else {
+        toast({ title: 'Ошибка загрузки', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка загрузки', variant: 'destructive' });
+    } finally {
+      setUploadingId(null);
+    }
   };
 
   const startEditing = (id: UUID, currentName: string) => {
@@ -208,20 +228,26 @@ export const AssetsEditor = ({
 
                       {/* Оверлей с действиями */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleImageUpload(bg.id, file);
-                            }}
-                          />
-                          <div className="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-                            <Upload className="h-4 w-4" />
+                        {uploadingId === bg.id ? (
+                          <div className="p-2 bg-primary text-primary-foreground rounded-md">
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           </div>
-                        </label>
+                        ) : (
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(bg.id, file);
+                              }}
+                            />
+                            <div className="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                              <Upload className="h-4 w-4" />
+                            </div>
+                          </label>
+                        )}
                         <button
                           className="p-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
                           onClick={() => onDeleteBackground(bg.id)}
@@ -262,6 +288,7 @@ export const AssetsEditor = ({
                         audio={audio}
                         isPlaying={playingAudioId === audio.id}
                         isEditing={editingId === audio.id}
+                        isUploading={uploadingId === audio.id}
                         editingName={editingName}
                         onPlay={() => toggleAudioPlay(audio.id, audio.audioUrl)}
                         onEdit={() => startEditing(audio.id, audio.name)}
@@ -304,6 +331,7 @@ export const AssetsEditor = ({
                         audio={audio}
                         isPlaying={playingAudioId === audio.id}
                         isEditing={editingId === audio.id}
+                        isUploading={uploadingId === audio.id}
                         editingName={editingName}
                         onPlay={() => toggleAudioPlay(audio.id, audio.audioUrl)}
                         onEdit={() => startEditing(audio.id, audio.name)}
@@ -337,6 +365,7 @@ interface AudioItemProps {
   audio: AudioAsset;
   isPlaying: boolean;
   isEditing: boolean;
+  isUploading: boolean;
   editingName: string;
   onPlay: () => void;
   onEdit: () => void;
@@ -351,6 +380,7 @@ const AudioItem = ({
   audio,
   isPlaying,
   isEditing,
+  isUploading,
   editingName,
   onPlay,
   onEdit,
@@ -413,20 +443,26 @@ const AudioItem = ({
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onEdit}>
             <Edit2 className="h-4 w-4" />
           </Button>
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onUpload(file);
-              }}
-            />
-            <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent">
-              <Upload className="h-4 w-4" />
+          {isUploading ? (
+            <div className="h-8 w-8 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" />
             </div>
-          </label>
+          ) : (
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUpload(file);
+                }}
+              />
+              <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent">
+                <Upload className="h-4 w-4" />
+              </div>
+            </label>
+          )}
           <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>

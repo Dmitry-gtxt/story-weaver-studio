@@ -467,6 +467,7 @@ const Editor = () => {
             onAddSprite={handleAddSprite}
             onDeleteSprite={handleDeleteSprite}
             generateId={generateId}
+            userId={user?.id || ''}
           />
         ) : (
           <AssetsEditor
@@ -479,6 +480,7 @@ const Editor = () => {
             onUpdateAudio={handleUpdateAudio}
             onDeleteAudio={handleDeleteAudio}
             generateId={generateId}
+            userId={user?.id || ''}
           />
         )}
       </div>
