@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode, AudioNode, JumpNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Volume2 } from 'lucide-react';
+import { ChevronRight, Volume2, Save, FolderOpen } from 'lucide-react';
 import { useAudioManager } from '@/hooks/useAudioManager';
 import { useTypewriter } from '@/hooks/useTypewriter';
+import { useSaveSystem } from '@/hooks/useSaveSystem';
 
 interface NovelPlayerProps {
   novel: Novel;
@@ -31,9 +32,13 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
   const [onScreenCharacters, setOnScreenCharacters] = useState<OnScreenCharacter[]>([]);
   const [currentBackgroundId, setCurrentBackgroundId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Аудио менеджер
   const { playBgm, stopBgm, fadeOutBgm, playSfx, getCurrentBgmId } = useAudioManager(novel.audio);
+
+  // Система сохранений
+  const { saveGame, loadGame, hasSave } = useSaveSystem(novel.id);
 
   // Найти текущую сцену
   const currentScene = useMemo((): Scene | undefined => {
@@ -179,8 +184,42 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters([]);
   };
 
-  // Обработать начальные узлы типа character, background, audio и jump
+  // Сохранение игры
+  const handleSave = () => {
+    saveGame({
+      currentSceneId,
+      currentNodeIndex,
+      onScreenCharacters,
+      currentBackgroundId,
+      currentBgmId: getCurrentBgmId(),
+    });
+  };
+
+  // Загрузка игры
+  const handleLoad = () => {
+    const data = loadGame();
+    if (data) {
+      setIsLoading(true);
+      stopBgm();
+      
+      setCurrentSceneId(data.currentSceneId);
+      setCurrentNodeIndex(data.currentNodeIndex);
+      setOnScreenCharacters(data.onScreenCharacters);
+      setCurrentBackgroundId(data.currentBackgroundId);
+      
+      // Восстановить музыку
+      if (data.currentBgmId) {
+        setTimeout(() => playBgm(data.currentBgmId!), 100);
+      }
+      
+      setTimeout(() => setIsLoading(false), 100);
+    }
+  };
+
+  // Не обрабатывать начальные узлы при загрузке сохранения
   useEffect(() => {
+    if (isLoading) return;
+    
     if (currentScene && currentNodeIndex === 0) {
       let idx = 0;
       while (idx < currentScene.nodes.length) {
@@ -206,7 +245,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         setCurrentNodeIndex(idx);
       }
     }
-  }, [currentSceneId]);
+  }, [currentSceneId, isLoading]);
 
   // Рендер текущего узла с typewriter
   const renderNode = (node: SceneNode) => {
@@ -403,12 +442,43 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         </div>
       </div>
 
-      {/* Заголовок сцены и индикатор звука */}
-      <div className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground/50">
-        <span>{currentScene.name}</span>
-        {getCurrentBgmId() && (
-          <Volume2 className="h-4 w-4 animate-pulse" />
-        )}
+      {/* Заголовок сцены и управление */}
+      <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+          <span>{currentScene.name}</span>
+          {getCurrentBgmId() && (
+            <Volume2 className="h-4 w-4 animate-pulse" />
+          )}
+        </div>
+        
+        {/* Кнопки сохранения/загрузки */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground/70 hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSave();
+            }}
+          >
+            <Save className="h-4 w-4 mr-1" />
+            Сохранить
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground/70 hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLoad();
+            }}
+            disabled={!hasSave()}
+          >
+            <FolderOpen className="h-4 w-4 mr-1" />
+            Загрузить
+          </Button>
+        </div>
       </div>
     </div>
   );
