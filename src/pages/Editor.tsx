@@ -1,325 +1,410 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Novel, Scene, SceneNode, UUID, Character, CharacterSprite, Background, AudioAsset } from '@/types/novel';
-import { mockNovel } from '@/data/mockNovel';
 import { ScenesList } from '@/components/Editor/ScenesList';
 import { NodeEditor } from '@/components/Editor/NodeEditor';
 import { CharacterEditor } from '@/components/Editor/CharacterEditor';
 import { AssetsEditor } from '@/components/Editor/AssetsEditor';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Play, Film, Users, FolderOpen, Save, RotateCcw } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, Play, Film, Users, FolderOpen, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const NOVEL_STORAGE_KEY = 'novel_editor_data';
+import { useAuth } from '@/hooks/useAuth';
+import * as api from '@/lib/novelApi';
+import { uploadFile } from '@/lib/storage';
 
 type EditorTab = 'scenes' | 'characters' | 'assets';
 
-// Загрузка из localStorage
-const loadNovelFromStorage = (): Novel => {
-  try {
-    const saved = localStorage.getItem(NOVEL_STORAGE_KEY);
-    if (saved) {
-      return JSON.parse(saved) as Novel;
-    }
-  } catch (e) {
-    console.error('Ошибка загрузки новеллы:', e);
-  }
-  return mockNovel;
-};
-
 const Editor = () => {
-  const [novel, setNovel] = useState<Novel>(loadNovelFromStorage);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  // Автосохранение при изменениях
-  useEffect(() => {
-    if (hasUnsavedChanges) {
-      const timeoutId = setTimeout(() => {
-        try {
-          localStorage.setItem(NOVEL_STORAGE_KEY, JSON.stringify(novel));
-          setHasUnsavedChanges(false);
-          toast.success('Сохранено');
-        } catch (e) {
-          toast.error('Ошибка сохранения');
-        }
-      }, 1000); // Debounce 1 секунда
-      return () => clearTimeout(timeoutId);
-    }
-  }, [novel, hasUnsavedChanges]);
-
-  // Обёртка для setNovel с отслеживанием изменений
-  const updateNovel = useCallback((updater: (prev: Novel) => Novel) => {
-    setNovel(updater);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Принудительное сохранение
-  const handleSave = useCallback(() => {
-    try {
-      localStorage.setItem(NOVEL_STORAGE_KEY, JSON.stringify(novel));
-      setHasUnsavedChanges(false);
-      toast.success('Новелла сохранена');
-    } catch (e) {
-      toast.error('Ошибка сохранения');
-    }
-  }, [novel]);
-
-  // Сброс к исходным данным
-  const handleReset = useCallback(() => {
-    if (confirm('Сбросить все изменения? Это действие нельзя отменить.')) {
-      localStorage.removeItem(NOVEL_STORAGE_KEY);
-      setNovel(mockNovel);
-      setHasUnsavedChanges(false);
-      toast.success('Данные сброшены');
-    }
-  }, []);
+  const { novelId } = useParams<{ novelId: string }>();
+  const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useAuth();
+  
+  const [novel, setNovel] = useState<Novel | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<EditorTab>('scenes');
-  const [selectedSceneId, setSelectedSceneId] = useState<UUID | null>(
-    novel.chapters[0]?.scenes[0]?.id || null
-  );
+  const [selectedSceneId, setSelectedSceneId] = useState<UUID | null>(null);
+
+  // Редирект если не авторизован
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Загрузка новеллы
+  useEffect(() => {
+    const loadNovel = async () => {
+      if (!novelId || !user) return;
+      
+      setIsLoading(true);
+      const data = await api.loadNovelFromDb(novelId);
+      
+      if (!data) {
+        toast.error('Новелла не найдена');
+        navigate('/novels');
+        return;
+      }
+      
+      setNovel(data);
+      setSelectedSceneId(data.chapters[0]?.scenes[0]?.id || null);
+      setIsLoading(false);
+    };
+
+    if (user && novelId) {
+      loadNovel();
+    }
+  }, [novelId, user, navigate]);
 
   // Найти выбранную сцену
-  const selectedScene = novel.chapters
+  const selectedScene = novel?.chapters
     .flatMap(ch => ch.scenes)
     .find(s => s.id === selectedSceneId);
 
   // Все сцены для выбора в dropdown
-  const allScenes = novel.chapters.flatMap(ch => ch.scenes);
+  const allScenes = novel?.chapters.flatMap(ch => ch.scenes) || [];
 
   // Генерация уникального ID
-  const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const generateId = () => crypto.randomUUID();
 
-  // Добавить новую сцену
-  const handleAddScene = () => {
+  // === СЦЕНЫ ===
+  const handleAddScene = async () => {
+    if (!novel || !novelId) return;
+    
+    const chapterId = novel.chapters[0]?.id;
+    if (!chapterId) return;
+
     const newScene: Scene = {
       id: generateId(),
       name: `Новая сцена ${novel.chapters[0].scenes.length + 1}`,
       nodes: [],
     };
 
-    updateNovel(prev => ({
-      ...prev,
-      chapters: prev.chapters.map((ch, idx) =>
-        idx === 0
-          ? { ...ch, scenes: [...ch.scenes, newScene] }
-          : ch
-      ),
-    }));
+    setIsSaving(true);
+    const success = await api.addScene(chapterId, {
+      id: newScene.id,
+      name: newScene.name,
+      orderIndex: novel.chapters[0].scenes.length,
+    });
+    setIsSaving(false);
 
-    setSelectedSceneId(newScene.id);
-  };
-
-  // Удалить сцену
-  const handleDeleteScene = (sceneId: UUID) => {
-    updateNovel(prev => ({
-      ...prev,
-      chapters: prev.chapters.map(ch => ({
-        ...ch,
-        scenes: ch.scenes.filter(s => s.id !== sceneId),
-      })),
-    }));
-
-    if (selectedSceneId === sceneId) {
-      const remainingScenes = novel.chapters.flatMap(ch => ch.scenes).filter(s => s.id !== sceneId);
-      setSelectedSceneId(remainingScenes[0]?.id || null);
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        chapters: prev.chapters.map((ch, idx) =>
+          idx === 0 ? { ...ch, scenes: [...ch.scenes, newScene] } : ch
+        ),
+      } : null);
+      setSelectedSceneId(newScene.id);
+      toast.success('Сцена добавлена');
+    } else {
+      toast.error('Ошибка добавления сцены');
     }
   };
 
-  // Переименовать сцену
-  const handleRenameScene = (sceneId: UUID, newName: string) => {
-    updateNovel(prev => ({
-      ...prev,
-      chapters: prev.chapters.map(ch => ({
-        ...ch,
-        scenes: ch.scenes.map(s =>
-          s.id === sceneId ? { ...s, name: newName } : s
-        ),
-      })),
-    }));
+  const handleDeleteScene = async (sceneId: UUID) => {
+    if (!novel) return;
+
+    setIsSaving(true);
+    const success = await api.deleteScene(sceneId);
+    setIsSaving(false);
+
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        chapters: prev.chapters.map(ch => ({
+          ...ch,
+          scenes: ch.scenes.filter(s => s.id !== sceneId),
+        })),
+      } : null);
+
+      if (selectedSceneId === sceneId) {
+        const remainingScenes = novel.chapters.flatMap(ch => ch.scenes).filter(s => s.id !== sceneId);
+        setSelectedSceneId(remainingScenes[0]?.id || null);
+      }
+      toast.success('Сцена удалена');
+    } else {
+      toast.error('Ошибка удаления');
+    }
   };
 
-  // Добавить узел в сцену
-  const handleAddNode = (sceneId: UUID, node: SceneNode) => {
-    updateNovel(prev => ({
+  const handleRenameScene = async (sceneId: UUID, newName: string) => {
+    const success = await api.updateScene(sceneId, { name: newName });
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        chapters: prev.chapters.map(ch => ({
+          ...ch,
+          scenes: ch.scenes.map(s =>
+            s.id === sceneId ? { ...s, name: newName } : s
+          ),
+        })),
+      } : null);
+    }
+  };
+
+  // === УЗЛЫ ===
+  const handleAddNode = async (sceneId: UUID, node: SceneNode) => {
+    if (!novel) return;
+    
+    const scene = novel.chapters.flatMap(ch => ch.scenes).find(s => s.id === sceneId);
+    const orderIndex = scene?.nodes.length || 0;
+
+    const success = await api.addSceneNode(sceneId, node, orderIndex);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        chapters: prev.chapters.map(ch => ({
+          ...ch,
+          scenes: ch.scenes.map(s =>
+            s.id === sceneId ? { ...s, nodes: [...s.nodes, node] } : s
+          ),
+        })),
+      } : null);
+    } else {
+      toast.error('Ошибка добавления узла');
+    }
+  };
+
+  const handleDeleteNode = async (sceneId: UUID, nodeId: UUID) => {
+    const success = await api.deleteSceneNode(nodeId);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        chapters: prev.chapters.map(ch => ({
+          ...ch,
+          scenes: ch.scenes.map(s =>
+            s.id === sceneId ? { ...s, nodes: s.nodes.filter(n => n.id !== nodeId) } : s
+          ),
+        })),
+      } : null);
+    }
+  };
+
+  const handleUpdateNode = async (sceneId: UUID, nodeId: UUID, updates: Partial<SceneNode>) => {
+    const scene = novel?.chapters.flatMap(ch => ch.scenes).find(s => s.id === sceneId);
+    const node = scene?.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const updatedNode = { ...node, ...updates } as SceneNode;
+    await api.updateSceneNode(nodeId, updatedNode);
+    
+    setNovel(prev => prev ? {
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
         scenes: ch.scenes.map(s =>
           s.id === sceneId
-            ? { ...s, nodes: [...s.nodes, node] }
+            ? { ...s, nodes: s.nodes.map(n => n.id === nodeId ? updatedNode : n) }
             : s
         ),
       })),
-    }));
+    } : null);
   };
 
-  // Удалить узел из сцены
-  const handleDeleteNode = (sceneId: UUID, nodeId: UUID) => {
-    updateNovel(prev => ({
+  const handleReorderNodes = async (sceneId: UUID, fromIndex: number, toIndex: number) => {
+    if (!novel) return;
+
+    const scene = novel.chapters.flatMap(ch => ch.scenes).find(s => s.id === sceneId);
+    if (!scene) return;
+
+    const newNodes = [...scene.nodes];
+    const [movedNode] = newNodes.splice(fromIndex, 1);
+    newNodes.splice(toIndex, 0, movedNode);
+
+    setNovel(prev => prev ? {
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
         scenes: ch.scenes.map(s =>
-          s.id === sceneId
-            ? { ...s, nodes: s.nodes.filter(n => n.id !== nodeId) }
-            : s
+          s.id === sceneId ? { ...s, nodes: newNodes } : s
         ),
       })),
-    }));
+    } : null);
+
+    await api.reorderSceneNodes(sceneId, newNodes.map(n => n.id));
   };
 
-  // Обновить узел
-  const handleUpdateNode = (sceneId: UUID, nodeId: UUID, updates: Partial<SceneNode>) => {
-    updateNovel(prev => ({
-      ...prev,
-      chapters: prev.chapters.map(ch => ({
-        ...ch,
-        scenes: ch.scenes.map(s =>
-          s.id === sceneId
-            ? {
-                ...s,
-                nodes: s.nodes.map(n =>
-                  n.id === nodeId ? { ...n, ...updates } as SceneNode : n
-                ),
-              }
-            : s
-        ),
-      })),
-    }));
+  // === ПЕРСОНАЖИ ===
+  const handleAddCharacter = async (character: Character) => {
+    if (!novelId) return;
+
+    const success = await api.addCharacter(novelId, character);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        characters: [...prev.characters, character],
+      } : null);
+      toast.success('Персонаж добавлен');
+    } else {
+      toast.error('Ошибка добавления');
+    }
   };
 
-  // Изменить порядок узлов
-  const handleReorderNodes = (sceneId: UUID, fromIndex: number, toIndex: number) => {
-    updateNovel(prev => ({
-      ...prev,
-      chapters: prev.chapters.map(ch => ({
-        ...ch,
-        scenes: ch.scenes.map(s => {
-          if (s.id !== sceneId) return s;
-          const newNodes = [...s.nodes];
-          const [movedNode] = newNodes.splice(fromIndex, 1);
-          newNodes.splice(toIndex, 0, movedNode);
-          return { ...s, nodes: newNodes };
-        }),
-      })),
-    }));
-  };
-
-  // Добавить персонажа
-  const handleAddCharacter = (character: Character) => {
-    updateNovel(prev => ({
-      ...prev,
-      characters: [...prev.characters, character],
-    }));
-  };
-
-  // Обновить персонажа
-  const handleUpdateCharacter = (characterId: UUID, updates: Partial<Character>) => {
-    updateNovel(prev => ({
+  const handleUpdateCharacter = async (characterId: UUID, updates: Partial<Character>) => {
+    await api.updateCharacter(characterId, updates);
+    
+    setNovel(prev => prev ? {
       ...prev,
       characters: prev.characters.map(c =>
         c.id === characterId ? { ...c, ...updates } : c
       ),
-    }));
+    } : null);
   };
 
-  // Удалить персонажа
-  const handleDeleteCharacter = (characterId: UUID) => {
-    updateNovel(prev => ({
-      ...prev,
-      characters: prev.characters.filter(c => c.id !== characterId),
-    }));
+  const handleDeleteCharacter = async (characterId: UUID) => {
+    const success = await api.deleteCharacter(characterId);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        characters: prev.characters.filter(c => c.id !== characterId),
+      } : null);
+      toast.success('Персонаж удалён');
+    }
   };
 
-  // Добавить спрайт персонажу
-  const handleAddSprite = (characterId: UUID, sprite: CharacterSprite) => {
-    updateNovel(prev => ({
-      ...prev,
-      characters: prev.characters.map(c =>
-        c.id === characterId
-          ? { ...c, sprites: [...c.sprites, sprite] }
-          : c
-      ),
-    }));
+  const handleAddSprite = async (characterId: UUID, sprite: CharacterSprite) => {
+    const success = await api.addSprite(characterId, sprite);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        characters: prev.characters.map(c =>
+          c.id === characterId ? { ...c, sprites: [...c.sprites, sprite] } : c
+        ),
+      } : null);
+    }
   };
 
-  // Удалить спрайт
-  const handleDeleteSprite = (characterId: UUID, spriteId: UUID) => {
-    updateNovel(prev => ({
-      ...prev,
-      characters: prev.characters.map(c =>
-        c.id === characterId
-          ? { ...c, sprites: c.sprites.filter(s => s.id !== spriteId) }
-          : c
-      ),
-    }));
+  const handleDeleteSprite = async (characterId: UUID, spriteId: UUID) => {
+    const success = await api.deleteSprite(spriteId);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        characters: prev.characters.map(c =>
+          c.id === characterId ? { ...c, sprites: c.sprites.filter(s => s.id !== spriteId) } : c
+        ),
+      } : null);
+    }
   };
 
-  // Добавить фон
-  const handleAddBackground = (bg: Background) => {
-    updateNovel(prev => ({
-      ...prev,
-      backgrounds: [...prev.backgrounds, bg],
-    }));
+  // === ФОНЫ ===
+  const handleAddBackground = async (bg: Background) => {
+    if (!novelId) return;
+
+    const success = await api.addBackground(novelId, bg);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        backgrounds: [...prev.backgrounds, bg],
+      } : null);
+      toast.success('Фон добавлен');
+    }
   };
 
-  // Обновить фон
-  const handleUpdateBackground = (bgId: UUID, updates: Partial<Background>) => {
-    updateNovel(prev => ({
+  const handleUpdateBackground = async (bgId: UUID, updates: Partial<Background>) => {
+    await api.updateBackground(bgId, updates);
+    
+    setNovel(prev => prev ? {
       ...prev,
       backgrounds: prev.backgrounds.map(b =>
         b.id === bgId ? { ...b, ...updates } : b
       ),
-    }));
+    } : null);
   };
 
-  // Удалить фон
-  const handleDeleteBackground = (bgId: UUID) => {
-    updateNovel(prev => ({
-      ...prev,
-      backgrounds: prev.backgrounds.filter(b => b.id !== bgId),
-    }));
+  const handleDeleteBackground = async (bgId: UUID) => {
+    const success = await api.deleteBackground(bgId);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        backgrounds: prev.backgrounds.filter(b => b.id !== bgId),
+      } : null);
+      toast.success('Фон удалён');
+    }
   };
 
-  // Добавить аудио
-  const handleAddAudio = (audio: AudioAsset) => {
-    updateNovel(prev => ({
-      ...prev,
-      audio: [...prev.audio, audio],
-    }));
+  // === АУДИО ===
+  const handleAddAudio = async (audio: AudioAsset) => {
+    if (!novelId) return;
+
+    const success = await api.addAudioAsset(novelId, audio);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        audio: [...prev.audio, audio],
+      } : null);
+      toast.success('Аудио добавлено');
+    }
   };
 
-  // Обновить аудио
-  const handleUpdateAudio = (audioId: UUID, updates: Partial<AudioAsset>) => {
-    updateNovel(prev => ({
+  const handleUpdateAudio = async (audioId: UUID, updates: Partial<AudioAsset>) => {
+    await api.updateAudioAsset(audioId, updates);
+    
+    setNovel(prev => prev ? {
       ...prev,
       audio: prev.audio.map(a =>
         a.id === audioId ? { ...a, ...updates } : a
       ),
-    }));
+    } : null);
   };
 
-  // Удалить аудио
-  const handleDeleteAudio = (audioId: UUID) => {
-    updateNovel(prev => ({
-      ...prev,
-      audio: prev.audio.filter(a => a.id !== audioId),
-    }));
+  const handleDeleteAudio = async (audioId: UUID) => {
+    const success = await api.deleteAudioAsset(audioId);
+    
+    if (success) {
+      setNovel(prev => prev ? {
+        ...prev,
+        audio: prev.audio.filter(a => a.id !== audioId),
+      } : null);
+      toast.success('Аудио удалено');
+    }
   };
+
+  // Загрузка файлов
+  const handleUploadFile = useCallback(async (file: File, type: 'image' | 'audio'): Promise<string | null> => {
+    if (!user) return null;
+    return await uploadFile(user.id, file, type);
+  }, [user]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!novel) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p>Новелла не найдена</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Заголовок */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-4">
-          <Link to="/">
+          <Link to="/novels">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              К плееру
+              К списку
             </Button>
           </Link>
-          <h1 className="text-lg font-semibold">{novel.title} — Редактор</h1>
+          <h1 className="text-lg font-semibold">{novel.title}</h1>
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
         
         <div className="flex items-center gap-4">
@@ -340,35 +425,18 @@ const Editor = () => {
             </TabsList>
           </Tabs>
           
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleSave}
-              className={hasUnsavedChanges ? 'border-yellow-500' : ''}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {hasUnsavedChanges ? 'Сохранить*' : 'Сохранено'}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <Link to="/">
+          <Link to={`/play/${novelId}`}>
             <Button size="sm">
               <Play className="h-4 w-4 mr-2" />
-              Запустить
+              Играть
             </Button>
           </Link>
         </div>
       </header>
 
-      {/* Основная область */}
       <div className="flex-1 flex overflow-hidden">
         {activeTab === 'scenes' ? (
           <>
-            {/* Левая панель — список сцен */}
             <ScenesList
               chapters={novel.chapters}
               selectedSceneId={selectedSceneId}
@@ -377,8 +445,6 @@ const Editor = () => {
               onDeleteScene={handleDeleteScene}
               onRenameScene={handleRenameScene}
             />
-
-            {/* Правая панель — редактор узлов */}
             <NodeEditor
               scene={selectedScene}
               allScenes={allScenes}
