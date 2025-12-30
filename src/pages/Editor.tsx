@@ -178,6 +178,8 @@ const Editor = () => {
           scene={selectedScene}
           allScenes={allScenes}
           characters={novel.characters}
+          backgrounds={novel.backgrounds}
+          audioAssets={novel.audio}
           onAddNode={(node) => selectedSceneId && handleAddNode(selectedSceneId, node)}
           onDeleteNode={(nodeId) => selectedSceneId && handleDeleteNode(selectedSceneId, nodeId)}
           onUpdateNode={(nodeId, updates) => selectedSceneId && handleUpdateNode(selectedSceneId, nodeId, updates)}

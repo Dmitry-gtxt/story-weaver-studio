@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
-import { Scene, SceneNode, Character, UUID, DialogueNode, NarrationNode, ChoiceNode } from '@/types/novel';
+import { useState } from 'react';
+import { Scene, SceneNode, Character, UUID, DialogueNode, NarrationNode, ChoiceNode, BackgroundNode, CharacterNode, AudioNode, JumpNode, Background, AudioAsset } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, MessageSquare, FileText, GitBranch, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, FileText, GitBranch, GripVertical, ChevronUp, ChevronDown, Eye, EyeOff, Image, User, Music, ArrowRight } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -11,12 +11,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 
 interface NodeEditorProps {
   scene: Scene | undefined;
   allScenes: Scene[];
   characters: Character[];
+  backgrounds: Background[];
+  audioAssets: AudioAsset[];
   onAddNode: (node: SceneNode) => void;
   onDeleteNode: (nodeId: UUID) => void;
   onUpdateNode: (nodeId: UUID, updates: Partial<SceneNode>) => void;
@@ -28,6 +32,8 @@ export const NodeEditor = ({
   scene,
   allScenes,
   characters,
+  backgrounds,
+  audioAssets,
   onAddNode,
   onDeleteNode,
   onUpdateNode,
@@ -45,6 +51,7 @@ export const NodeEditor = ({
     );
   }
 
+  // Обработчики добавления узлов
   const handleAddDialogue = () => {
     const node: DialogueNode = {
       id: generateId(),
@@ -73,6 +80,46 @@ export const NodeEditor = ({
         { id: generateId(), text: 'Вариант 1', targetSceneId: '' },
         { id: generateId(), text: 'Вариант 2', targetSceneId: '' },
       ],
+    };
+    onAddNode(node);
+  };
+
+  const handleAddBackground = () => {
+    const node: BackgroundNode = {
+      id: generateId(),
+      type: 'background',
+      backgroundId: backgrounds[0]?.id || '',
+      transition: 'fade',
+    };
+    onAddNode(node);
+  };
+
+  const handleAddCharacter = () => {
+    const node: CharacterNode = {
+      id: generateId(),
+      type: 'character',
+      characterId: characters[0]?.id || '',
+      action: 'enter',
+      position: 'center',
+    };
+    onAddNode(node);
+  };
+
+  const handleAddAudio = () => {
+    const node: AudioNode = {
+      id: generateId(),
+      type: 'audio',
+      audioId: audioAssets[0]?.id || '',
+      action: 'play',
+    };
+    onAddNode(node);
+  };
+
+  const handleAddJump = () => {
+    const node: JumpNode = {
+      id: generateId(),
+      type: 'jump',
+      targetSceneId: allScenes[0]?.id || '',
     };
     onAddNode(node);
   };
@@ -109,6 +156,14 @@ export const NodeEditor = ({
         return <FileText className="h-4 w-4" />;
       case 'choice':
         return <GitBranch className="h-4 w-4" />;
+      case 'background':
+        return <Image className="h-4 w-4" />;
+      case 'character':
+        return <User className="h-4 w-4" />;
+      case 'audio':
+        return <Music className="h-4 w-4" />;
+      case 'jump':
+        return <ArrowRight className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
     }
@@ -254,12 +309,191 @@ export const NodeEditor = ({
           </div>
         );
       }
-      default:
+      case 'background': {
+        const bgNode = node as BackgroundNode;
+        const bg = backgrounds.find(b => b.id === bgNode.backgroundId);
         return (
-          <div className="text-sm text-muted-foreground">
-            Редактирование узла типа "{node.type}" пока не поддерживается
+          <div className="flex gap-3">
+            <Select
+              value={bgNode.backgroundId || 'none'}
+              onValueChange={(value) => onUpdateNode(node.id, { backgroundId: value === 'none' ? '' : value })}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Выберите фон" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">Не выбрано</span>
+                </SelectItem>
+                {backgrounds.map(b => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={bgNode.transition || 'fade'}
+              onValueChange={(value) => onUpdateNode(node.id, { transition: value as 'fade' | 'instant' | 'dissolve' })}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Переход" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="fade">Плавно</SelectItem>
+                <SelectItem value="instant">Мгновенно</SelectItem>
+                <SelectItem value="dissolve">Растворение</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         );
+      }
+      case 'character': {
+        const charNode = node as CharacterNode;
+        const char = characters.find(c => c.id === charNode.characterId);
+        return (
+          <div className="flex flex-wrap gap-3">
+            <Select
+              value={charNode.characterId || 'none'}
+              onValueChange={(value) => onUpdateNode(node.id, { characterId: value === 'none' ? '' : value })}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Персонаж" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">Не выбрано</span>
+                </SelectItem>
+                {characters.map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <span style={{ color: `hsl(${c.color})` }}>{c.displayName}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={charNode.action}
+              onValueChange={(value) => onUpdateNode(node.id, { action: value as 'enter' | 'exit' | 'move' })}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Действие" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="enter">Появление</SelectItem>
+                <SelectItem value="exit">Уход</SelectItem>
+                <SelectItem value="move">Перемещение</SelectItem>
+              </SelectContent>
+            </Select>
+            {charNode.action !== 'exit' && (
+              <Select
+                value={charNode.position || 'center'}
+                onValueChange={(value) => onUpdateNode(node.id, { position: value as 'left' | 'center' | 'right' })}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Позиция" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="left">Слева</SelectItem>
+                  <SelectItem value="center">По центру</SelectItem>
+                  <SelectItem value="right">Справа</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Input
+              value={charNode.emotion || ''}
+              onChange={(e) => onUpdateNode(node.id, { emotion: e.target.value })}
+              placeholder="Эмоция (опционально)"
+              className="w-40"
+            />
+          </div>
+        );
+      }
+      case 'audio': {
+        const audioNode = node as AudioNode;
+        const audio = audioAssets.find(a => a.id === audioNode.audioId);
+        return (
+          <div className="flex gap-3">
+            <Select
+              value={audioNode.audioId || 'none'}
+              onValueChange={(value) => onUpdateNode(node.id, { audioId: value === 'none' ? '' : value })}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Аудио" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">Не выбрано</span>
+                </SelectItem>
+                {audioAssets.filter(a => a.type === 'bgm').length > 0 && (
+                  <>
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">Музыка</DropdownMenuLabel>
+                    {audioAssets.filter(a => a.type === 'bgm').map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        🎵 {a.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                {audioAssets.filter(a => a.type === 'sfx').length > 0 && (
+                  <>
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">Звуки</DropdownMenuLabel>
+                    {audioAssets.filter(a => a.type === 'sfx').map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        🔊 {a.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+            <Select
+              value={audioNode.action}
+              onValueChange={(value) => onUpdateNode(node.id, { action: value as 'play' | 'stop' | 'fade-out' })}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Действие" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="play">Воспроизвести</SelectItem>
+                <SelectItem value="stop">Остановить</SelectItem>
+                <SelectItem value="fade-out">Затухание</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
+      case 'jump': {
+        const jumpNode = node as JumpNode;
+        const targetScene = allScenes.find(s => s.id === jumpNode.targetSceneId);
+        return (
+          <Select
+            value={jumpNode.targetSceneId || 'none'}
+            onValueChange={(value) => onUpdateNode(node.id, { targetSceneId: value === 'none' ? '' : value })}
+          >
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Целевая сцена" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="none">
+                <span className="text-muted-foreground">Не выбрано</span>
+              </SelectItem>
+              {allScenes.map(s => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      }
+      default: {
+        const unknownNode = node as { type: string };
+        return (
+          <div className="text-sm text-muted-foreground">
+            Неизвестный тип узла: {unknownNode.type}
+          </div>
+        );
+      }
     }
   };
 
@@ -301,8 +535,54 @@ export const NodeEditor = ({
           </div>
         );
       }
-      default:
-        return <div className="text-sm text-muted-foreground">[{node.type}]</div>;
+      case 'background': {
+        const bgNode = node as BackgroundNode;
+        const bg = backgrounds.find(b => b.id === bgNode.backgroundId);
+        return (
+          <div className="text-sm text-muted-foreground">
+            Фон: <span className="font-medium">{bg?.name || 'не выбран'}</span>
+            <span className="text-xs ml-2">({bgNode.transition})</span>
+          </div>
+        );
+      }
+      case 'character': {
+        const charNode = node as CharacterNode;
+        const char = characters.find(c => c.id === charNode.characterId);
+        const actionLabels = { enter: 'появляется', exit: 'уходит', move: 'перемещается' };
+        const posLabels = { left: 'слева', center: 'по центру', right: 'справа' };
+        return (
+          <div className="text-sm text-muted-foreground">
+            <span style={{ color: char ? `hsl(${char.color})` : undefined }} className="font-medium">
+              {char?.displayName || 'Персонаж'}
+            </span>{' '}
+            {actionLabels[charNode.action]}
+            {charNode.action !== 'exit' && charNode.position && ` ${posLabels[charNode.position]}`}
+          </div>
+        );
+      }
+      case 'audio': {
+        const audioNode = node as AudioNode;
+        const audio = audioAssets.find(a => a.id === audioNode.audioId);
+        const actionLabels = { play: '▶', stop: '⏹', 'fade-out': '🔉' };
+        return (
+          <div className="text-sm text-muted-foreground">
+            {actionLabels[audioNode.action]} {audio?.name || 'не выбрано'}
+          </div>
+        );
+      }
+      case 'jump': {
+        const jumpNode = node as JumpNode;
+        const targetScene = allScenes.find(s => s.id === jumpNode.targetSceneId);
+        return (
+          <div className="text-sm text-muted-foreground">
+            → Переход в: <span className="font-medium">{targetScene?.name || 'не выбрано'}</span>
+          </div>
+        );
+      }
+      default: {
+        const unknownNode = node as { type: string };
+        return <div className="text-sm text-muted-foreground">[{unknownNode.type}]</div>;
+      }
     }
   };
 
@@ -330,6 +610,7 @@ export const NodeEditor = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-popover">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Контент</DropdownMenuLabel>
             <DropdownMenuItem onClick={handleAddDialogue}>
               <MessageSquare className="h-4 w-4 mr-2" />
               Диалог
@@ -341,6 +622,26 @@ export const NodeEditor = ({
             <DropdownMenuItem onClick={handleAddChoice}>
               <GitBranch className="h-4 w-4 mr-2" />
               Выбор
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Сцена</DropdownMenuLabel>
+            <DropdownMenuItem onClick={handleAddBackground}>
+              <Image className="h-4 w-4 mr-2" />
+              Фон
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddCharacter}>
+              <User className="h-4 w-4 mr-2" />
+              Персонаж
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddAudio}>
+              <Music className="h-4 w-4 mr-2" />
+              Звук
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Навигация</DropdownMenuLabel>
+            <DropdownMenuItem onClick={handleAddJump}>
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Переход
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
