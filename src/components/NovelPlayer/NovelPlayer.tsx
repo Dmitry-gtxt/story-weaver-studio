@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode, AudioNode } from '@/types/novel';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode, AudioNode, JumpNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, Volume2 } from 'lucide-react';
 import { useAudioManager } from '@/hooks/useAudioManager';
+import { useTypewriter } from '@/hooks/useTypewriter';
 
 interface NovelPlayerProps {
   novel: Novel;
@@ -44,6 +45,19 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   }, [novel, currentSceneId]);
 
   const currentNode = currentScene?.nodes[currentNodeIndex];
+
+  // Получить текст текущего узла для typewriter
+  const getCurrentText = useCallback(() => {
+    if (!currentNode) return '';
+    if (currentNode.type === 'dialogue') return (currentNode as DialogueNode).text;
+    if (currentNode.type === 'narration') return (currentNode as NarrationNode).text;
+    return '';
+  }, [currentNode]);
+
+  const { displayedText, isComplete: isTextComplete, skipToEnd } = useTypewriter({
+    text: getCurrentText(),
+    speed: 25,
+  });
 
   // Получить персонажа по ID
   const getCharacter = (characterId: string) => {
@@ -117,8 +131,21 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     }
   };
 
+  // Обработка узла 'jump'
+  const processJumpNode = (node: JumpNode) => {
+    setCurrentSceneId(node.targetSceneId);
+    setCurrentNodeIndex(0);
+    setOnScreenCharacters([]);
+  };
+
   // Перейти к следующему узлу
   const handleNext = () => {
+    // Если текст ещё печатается — показать весь текст
+    if (!isTextComplete && (currentNode?.type === 'dialogue' || currentNode?.type === 'narration')) {
+      skipToEnd();
+      return;
+    }
+
     if (!currentScene) return;
     
     if (currentNodeIndex < currentScene.nodes.length - 1) {
@@ -137,6 +164,8 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         processAudioNode(nextNode as AudioNode);
         setCurrentNodeIndex(nextIndex);
         setTimeout(() => handleNext(), 50);
+      } else if (nextNode.type === 'jump') {
+        processJumpNode(nextNode as JumpNode);
       } else {
         setCurrentNodeIndex(nextIndex);
       }
@@ -150,7 +179,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters([]);
   };
 
-  // Обработать начальные узлы типа character, background и audio
+  // Обработать начальные узлы типа character, background, audio и jump
   useEffect(() => {
     if (currentScene && currentNodeIndex === 0) {
       let idx = 0;
@@ -165,6 +194,10 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         } else if (node.type === 'audio') {
           processAudioNode(node as AudioNode);
           idx++;
+        } else if (node.type === 'jump') {
+          // Jump в начале сцены — сразу переходим
+          processJumpNode(node as JumpNode);
+          return;
         } else {
           break;
         }
@@ -175,7 +208,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     }
   }, [currentSceneId]);
 
-  // Рендер текущего узла
+  // Рендер текущего узла с typewriter
   const renderNode = (node: SceneNode) => {
     switch (node.type) {
       case 'dialogue': {
@@ -191,15 +224,18 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
                 {character.displayName}
               </span>
             )}
-            <p className="text-lg leading-relaxed">{dialogueNode.text}</p>
+            <p className="text-lg leading-relaxed">
+              {displayedText}
+              {!isTextComplete && <span className="animate-pulse">|</span>}
+            </p>
           </div>
         );
       }
       case 'narration': {
-        const narrationNode = node as NarrationNode;
         return (
           <p className="text-lg leading-relaxed italic text-muted-foreground">
-            {narrationNode.text}
+            {displayedText}
+            {!isTextComplete && <span className="animate-pulse">|</span>}
           </p>
         );
       }
