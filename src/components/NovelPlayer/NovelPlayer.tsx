@@ -18,13 +18,6 @@ interface OnScreenCharacter {
   emotion?: string;
 }
 
-// Градиенты-заглушки для разных фонов
-const BACKGROUND_GRADIENTS: Record<string, string> = {
-  'bg-1': 'linear-gradient(to bottom, hsl(220 40% 30%), hsl(220 50% 20%))', // Комната - тёмно-синий
-  'bg-2': 'linear-gradient(to bottom, hsl(40 60% 70%), hsl(30 50% 50%))', // Кухня - тёплый
-  'bg-3': 'linear-gradient(to bottom, hsl(200 80% 70%), hsl(200 60% 40%))', // Улица - голубой
-};
-
 const DEFAULT_GRADIENT = 'linear-gradient(to bottom, hsl(220 20% 20%), hsl(220 30% 10%))';
 
 export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
@@ -69,12 +62,20 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     return novel.characters.find(c => c.id === characterId);
   };
 
-  // Получить градиент фона
-  const getBackgroundStyle = () => {
-    if (currentBackgroundId && BACKGROUND_GRADIENTS[currentBackgroundId]) {
-      return BACKGROUND_GRADIENTS[currentBackgroundId];
+  // Получить фон по ID
+  const getBackground = (backgroundId: string) => {
+    return novel.backgrounds.find(b => b.id === backgroundId);
+  };
+
+  // Получить URL или градиент фона
+  const getBackgroundStyle = (): { backgroundImage?: string; background?: string } => {
+    if (currentBackgroundId) {
+      const bg = getBackground(currentBackgroundId);
+      if (bg?.imageUrl) {
+        return { backgroundImage: `url(${bg.imageUrl})` };
+      }
     }
-    return DEFAULT_GRADIENT;
+    return { background: DEFAULT_GRADIENT };
   };
 
   // Обработка узла 'character'
@@ -353,8 +354,8 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     <div className="relative h-screen w-full overflow-hidden">
       {/* Фон */}
       <div 
-        className="absolute inset-0 transition-all duration-500"
-        style={{ background: getBackgroundStyle() }}
+        className="absolute inset-0 transition-all duration-500 bg-cover bg-center bg-no-repeat"
+        style={getBackgroundStyle()}
       />
       
       {/* Область персонажей */}
