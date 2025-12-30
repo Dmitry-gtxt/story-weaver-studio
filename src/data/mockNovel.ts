@@ -30,6 +30,8 @@ export const mockNovel: Novel = {
   
   backgrounds: [
     { id: 'bg-1', name: 'Комната', imageUrl: '' },
+    { id: 'bg-2', name: 'Кухня', imageUrl: '' },
+    { id: 'bg-3', name: 'Улица', imageUrl: '' },
   ],
   
   audio: [],
@@ -43,7 +45,6 @@ export const mockNovel: Novel = {
           id: 'scene-1',
           name: 'Встреча',
           nodes: [
-            // Алиса появляется в центре
             {
               id: 'node-0',
               type: 'character',
@@ -69,7 +70,6 @@ export const mockNovel: Novel = {
               type: 'narration',
               text: 'В дверь постучали.',
             },
-            // Боб появляется справа
             {
               id: 'node-3b',
               type: 'character',
@@ -78,7 +78,6 @@ export const mockNovel: Novel = {
               position: 'right',
               emotion: 'neutral',
             },
-            // Алиса двигается влево
             {
               id: 'node-3c',
               type: 'character',
@@ -91,26 +90,101 @@ export const mockNovel: Novel = {
               type: 'dialogue',
               characterId: 'char-2',
               emotion: 'neutral',
-              text: 'Алиса! Ты проспишь завтрак!',
+              text: 'Алиса! Завтрак готов. Идёшь?',
             },
             {
               id: 'node-5',
+              type: 'choice',
+              prompt: 'Что ответить Бобу?',
+              options: [
+                {
+                  id: 'choice-1',
+                  text: 'Да, уже иду!',
+                  targetSceneId: 'scene-2',
+                },
+                {
+                  id: 'choice-2',
+                  text: 'Нет, хочу ещё поспать...',
+                  targetSceneId: 'scene-3',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'scene-2',
+          name: 'На кухне',
+          nodes: [
+            {
+              id: 'node-s2-0',
+              type: 'character',
+              characterId: 'char-1',
+              action: 'enter',
+              position: 'left',
+              emotion: 'happy',
+            },
+            {
+              id: 'node-s2-0b',
+              type: 'character',
+              characterId: 'char-2',
+              action: 'enter',
+              position: 'right',
+              emotion: 'neutral',
+            },
+            {
+              id: 'node-s2-1',
+              type: 'narration',
+              text: 'Алиса быстро оделась и спустилась на кухню.',
+            },
+            {
+              id: 'node-s2-2',
               type: 'dialogue',
               characterId: 'char-1',
               emotion: 'happy',
-              text: 'Уже иду, Боб!',
+              text: 'Ммм, как вкусно пахнет!',
             },
-            // Боб уходит
             {
-              id: 'node-5b',
-              type: 'character',
+              id: 'node-s2-3',
+              type: 'dialogue',
               characterId: 'char-2',
-              action: 'exit',
+              emotion: 'neutral',
+              text: 'Я приготовил твои любимые блинчики.',
             },
             {
-              id: 'node-6',
+              id: 'node-s2-4',
               type: 'narration',
-              text: 'Так начался этот необычный день...',
+              text: 'День начался отлично. Конец демо.',
+            },
+          ],
+        },
+        {
+          id: 'scene-3',
+          name: 'Снова в кровати',
+          nodes: [
+            {
+              id: 'node-s3-0',
+              type: 'character',
+              characterId: 'char-1',
+              action: 'enter',
+              position: 'center',
+              emotion: 'neutral',
+            },
+            {
+              id: 'node-s3-1',
+              type: 'narration',
+              text: 'Алиса накрылась одеялом с головой.',
+            },
+            {
+              id: 'node-s3-2',
+              type: 'dialogue',
+              characterId: 'char-1',
+              emotion: 'neutral',
+              text: 'Ещё пять минуточек...',
+            },
+            {
+              id: 'node-s3-3',
+              type: 'narration',
+              text: 'Она проспала до обеда. Конец демо.',
             },
           ],
         },
