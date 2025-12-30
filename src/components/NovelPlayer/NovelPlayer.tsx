@@ -173,8 +173,13 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         }
         return prev;
       }
-      // Добавить персонажа в центр по умолчанию
-      return [...prev, { characterId, position: 'center' as CharacterPosition, emotion }];
+      
+      // Определить позицию для нового персонажа (чтобы не перекрывались)
+      const positions: CharacterPosition[] = ['center', 'left', 'right'];
+      const usedPositions = prev.map(c => c.position);
+      const freePosition = positions.find(p => !usedPositions.includes(p)) || 'center';
+      
+      return [...prev, { characterId, position: freePosition, emotion }];
     });
   };
 
@@ -420,7 +425,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
+                  className="flex flex-col items-center"
                 >
                   {spriteUrl ? (
                     <img 
@@ -453,7 +458,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
+                  className="flex flex-col items-center"
                 >
                   {spriteUrl ? (
                     <img 
@@ -486,7 +491,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
+                  className="flex flex-col items-center"
                 >
                   {spriteUrl ? (
                     <img 
