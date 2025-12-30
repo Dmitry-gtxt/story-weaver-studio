@@ -18,6 +18,9 @@ const Editor = () => {
     .flatMap(ch => ch.scenes)
     .find(s => s.id === selectedSceneId);
 
+  // Все сцены для выбора в dropdown
+  const allScenes = novel.chapters.flatMap(ch => ch.scenes);
+
   // Генерация уникального ID
   const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -120,6 +123,23 @@ const Editor = () => {
     }));
   };
 
+  // Изменить порядок узлов
+  const handleReorderNodes = (sceneId: UUID, fromIndex: number, toIndex: number) => {
+    setNovel(prev => ({
+      ...prev,
+      chapters: prev.chapters.map(ch => ({
+        ...ch,
+        scenes: ch.scenes.map(s => {
+          if (s.id !== sceneId) return s;
+          const newNodes = [...s.nodes];
+          const [movedNode] = newNodes.splice(fromIndex, 1);
+          newNodes.splice(toIndex, 0, movedNode);
+          return { ...s, nodes: newNodes };
+        }),
+      })),
+    }));
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Заголовок */}
@@ -156,10 +176,12 @@ const Editor = () => {
         {/* Правая панель — редактор узлов */}
         <NodeEditor
           scene={selectedScene}
+          allScenes={allScenes}
           characters={novel.characters}
           onAddNode={(node) => selectedSceneId && handleAddNode(selectedSceneId, node)}
           onDeleteNode={(nodeId) => selectedSceneId && handleDeleteNode(selectedSceneId, nodeId)}
           onUpdateNode={(nodeId, updates) => selectedSceneId && handleUpdateNode(selectedSceneId, nodeId, updates)}
+          onReorderNodes={(from, to) => selectedSceneId && handleReorderNodes(selectedSceneId, from, to)}
           generateId={generateId}
         />
       </div>
