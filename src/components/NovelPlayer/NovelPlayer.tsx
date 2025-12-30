@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Novel, Scene, SceneNode, DialogueNode, NarrationNode } from '@/types/novel';
+import { useState, useMemo, useEffect } from 'react';
+import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 
@@ -7,9 +7,18 @@ interface NovelPlayerProps {
   novel: Novel;
 }
 
+type CharacterPosition = 'left' | 'center' | 'right';
+
+interface OnScreenCharacter {
+  characterId: string;
+  position: CharacterPosition;
+  emotion?: string;
+}
+
 export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   const [currentSceneId, setCurrentSceneId] = useState(novel.startSceneId);
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
+  const [onScreenCharacters, setOnScreenCharacters] = useState<OnScreenCharacter[]>([]);
 
   // Найти текущую сцену
   const currentScene = useMemo((): Scene | undefined => {
@@ -27,17 +36,76 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     return novel.characters.find(c => c.id === characterId);
   };
 
+  // Обработка узла 'character'
+  const processCharacterNode = (node: CharacterNode) => {
+    const { characterId, action, position = 'center', emotion } = node;
+
+    setOnScreenCharacters(prev => {
+      switch (action) {
+        case 'enter':
+          // Добавить персонажа если его нет
+          if (prev.find(c => c.characterId === characterId)) {
+            return prev.map(c => 
+              c.characterId === characterId 
+                ? { ...c, position, emotion } 
+                : c
+            );
+          }
+          return [...prev, { characterId, position, emotion }];
+        
+        case 'exit':
+          return prev.filter(c => c.characterId !== characterId);
+        
+        case 'move':
+          return prev.map(c => 
+            c.characterId === characterId 
+              ? { ...c, position, emotion: emotion ?? c.emotion } 
+              : c
+          );
+        
+        default:
+          return prev;
+      }
+    });
+  };
+
   // Перейти к следующему узлу
   const handleNext = () => {
     if (!currentScene) return;
     
     if (currentNodeIndex < currentScene.nodes.length - 1) {
-      setCurrentNodeIndex(prev => prev + 1);
+      const nextIndex = currentNodeIndex + 1;
+      const nextNode = currentScene.nodes[nextIndex];
+      
+      // Если следующий узел - character, обработать и пропустить
+      if (nextNode.type === 'character') {
+        processCharacterNode(nextNode as CharacterNode);
+        setCurrentNodeIndex(nextIndex);
+        // Рекурсивно проверяем следующий
+        setTimeout(() => handleNext(), 50);
+      } else {
+        setCurrentNodeIndex(nextIndex);
+      }
     } else {
-      // Конец сцены
+      // Конец сцены - сброс
       setCurrentNodeIndex(0);
+      setOnScreenCharacters([]);
     }
   };
+
+  // Обработать начальные узлы типа character
+  useEffect(() => {
+    if (currentScene && currentNodeIndex === 0) {
+      let idx = 0;
+      while (idx < currentScene.nodes.length && currentScene.nodes[idx].type === 'character') {
+        processCharacterNode(currentScene.nodes[idx] as CharacterNode);
+        idx++;
+      }
+      if (idx > 0) {
+        setCurrentNodeIndex(idx);
+      }
+    }
+  }, [currentSceneId]);
 
   // Рендер текущего узла
   const renderNode = (node: SceneNode) => {
@@ -87,10 +155,80 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
       {/* Фон */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-900" />
       
-      {/* Область персонажей (заглушка) */}
-      <div className="absolute inset-0 flex items-end justify-center pb-48">
-        <div className="text-muted-foreground/30 text-sm">
-          [ Здесь будут персонажи ]
+      {/* Область персонажей */}
+      <div className="absolute inset-x-0 bottom-48 top-16 flex items-end justify-center">
+        <div className="relative w-full max-w-5xl h-full flex items-end px-8">
+          {/* Left position */}
+          <div className="absolute left-8 bottom-0 w-32">
+            {onScreenCharacters.filter(c => c.position === 'left').map(({ characterId, emotion }) => {
+              const char = getCharacter(characterId);
+              if (!char) return null;
+              return (
+                <div
+                  key={characterId}
+                  className="flex flex-col items-center transition-all duration-300"
+                >
+                  <div 
+                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                    style={{ backgroundColor: `hsl(${char.color})` }}
+                  >
+                    <span className="rotate-0 text-center px-2">
+                      {char.displayName}
+                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Center position */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-32">
+            {onScreenCharacters.filter(c => c.position === 'center').map(({ characterId, emotion }) => {
+              const char = getCharacter(characterId);
+              if (!char) return null;
+              return (
+                <div
+                  key={characterId}
+                  className="flex flex-col items-center transition-all duration-300"
+                >
+                  <div 
+                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                    style={{ backgroundColor: `hsl(${char.color})` }}
+                  >
+                    <span className="rotate-0 text-center px-2">
+                      {char.displayName}
+                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right position */}
+          <div className="absolute right-8 bottom-0 w-32">
+            {onScreenCharacters.filter(c => c.position === 'right').map(({ characterId, emotion }) => {
+              const char = getCharacter(characterId);
+              if (!char) return null;
+              return (
+                <div
+                  key={characterId}
+                  className="flex flex-col items-center transition-all duration-300"
+                >
+                  <div 
+                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                    style={{ backgroundColor: `hsl(${char.color})` }}
+                  >
+                    <span className="rotate-0 text-center px-2">
+                      {char.displayName}
+                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
