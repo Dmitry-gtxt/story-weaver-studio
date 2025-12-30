@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Novel, Scene, SceneNode, UUID, Character, CharacterSprite, Background, AudioAsset } from '@/types/novel';
 import { mockNovel } from '@/data/mockNovel';
 import { ScenesList } from '@/components/Editor/ScenesList';
@@ -7,13 +7,73 @@ import { CharacterEditor } from '@/components/Editor/CharacterEditor';
 import { AssetsEditor } from '@/components/Editor/AssetsEditor';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Play, Film, Users, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Play, Film, Users, FolderOpen, Save, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+
+const NOVEL_STORAGE_KEY = 'novel_editor_data';
 
 type EditorTab = 'scenes' | 'characters' | 'assets';
 
+// Загрузка из localStorage
+const loadNovelFromStorage = (): Novel => {
+  try {
+    const saved = localStorage.getItem(NOVEL_STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved) as Novel;
+    }
+  } catch (e) {
+    console.error('Ошибка загрузки новеллы:', e);
+  }
+  return mockNovel;
+};
+
 const Editor = () => {
-  const [novel, setNovel] = useState<Novel>(mockNovel);
+  const [novel, setNovel] = useState<Novel>(loadNovelFromStorage);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Автосохранение при изменениях
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem(NOVEL_STORAGE_KEY, JSON.stringify(novel));
+          setHasUnsavedChanges(false);
+          toast.success('Сохранено');
+        } catch (e) {
+          toast.error('Ошибка сохранения');
+        }
+      }, 1000); // Debounce 1 секунда
+      return () => clearTimeout(timeoutId);
+    }
+  }, [novel, hasUnsavedChanges]);
+
+  // Обёртка для setNovel с отслеживанием изменений
+  const updateNovel = useCallback((updater: (prev: Novel) => Novel) => {
+    setNovel(updater);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Принудительное сохранение
+  const handleSave = useCallback(() => {
+    try {
+      localStorage.setItem(NOVEL_STORAGE_KEY, JSON.stringify(novel));
+      setHasUnsavedChanges(false);
+      toast.success('Новелла сохранена');
+    } catch (e) {
+      toast.error('Ошибка сохранения');
+    }
+  }, [novel]);
+
+  // Сброс к исходным данным
+  const handleReset = useCallback(() => {
+    if (confirm('Сбросить все изменения? Это действие нельзя отменить.')) {
+      localStorage.removeItem(NOVEL_STORAGE_KEY);
+      setNovel(mockNovel);
+      setHasUnsavedChanges(false);
+      toast.success('Данные сброшены');
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState<EditorTab>('scenes');
   const [selectedSceneId, setSelectedSceneId] = useState<UUID | null>(
     novel.chapters[0]?.scenes[0]?.id || null
@@ -38,7 +98,7 @@ const Editor = () => {
       nodes: [],
     };
 
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map((ch, idx) =>
         idx === 0
@@ -52,7 +112,7 @@ const Editor = () => {
 
   // Удалить сцену
   const handleDeleteScene = (sceneId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -68,7 +128,7 @@ const Editor = () => {
 
   // Переименовать сцену
   const handleRenameScene = (sceneId: UUID, newName: string) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -81,7 +141,7 @@ const Editor = () => {
 
   // Добавить узел в сцену
   const handleAddNode = (sceneId: UUID, node: SceneNode) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -96,7 +156,7 @@ const Editor = () => {
 
   // Удалить узел из сцены
   const handleDeleteNode = (sceneId: UUID, nodeId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -111,7 +171,7 @@ const Editor = () => {
 
   // Обновить узел
   const handleUpdateNode = (sceneId: UUID, nodeId: UUID, updates: Partial<SceneNode>) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -131,7 +191,7 @@ const Editor = () => {
 
   // Изменить порядок узлов
   const handleReorderNodes = (sceneId: UUID, fromIndex: number, toIndex: number) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       chapters: prev.chapters.map(ch => ({
         ...ch,
@@ -148,7 +208,7 @@ const Editor = () => {
 
   // Добавить персонажа
   const handleAddCharacter = (character: Character) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       characters: [...prev.characters, character],
     }));
@@ -156,7 +216,7 @@ const Editor = () => {
 
   // Обновить персонажа
   const handleUpdateCharacter = (characterId: UUID, updates: Partial<Character>) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       characters: prev.characters.map(c =>
         c.id === characterId ? { ...c, ...updates } : c
@@ -166,7 +226,7 @@ const Editor = () => {
 
   // Удалить персонажа
   const handleDeleteCharacter = (characterId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       characters: prev.characters.filter(c => c.id !== characterId),
     }));
@@ -174,7 +234,7 @@ const Editor = () => {
 
   // Добавить спрайт персонажу
   const handleAddSprite = (characterId: UUID, sprite: CharacterSprite) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       characters: prev.characters.map(c =>
         c.id === characterId
@@ -186,7 +246,7 @@ const Editor = () => {
 
   // Удалить спрайт
   const handleDeleteSprite = (characterId: UUID, spriteId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       characters: prev.characters.map(c =>
         c.id === characterId
@@ -198,7 +258,7 @@ const Editor = () => {
 
   // Добавить фон
   const handleAddBackground = (bg: Background) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       backgrounds: [...prev.backgrounds, bg],
     }));
@@ -206,7 +266,7 @@ const Editor = () => {
 
   // Обновить фон
   const handleUpdateBackground = (bgId: UUID, updates: Partial<Background>) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       backgrounds: prev.backgrounds.map(b =>
         b.id === bgId ? { ...b, ...updates } : b
@@ -216,7 +276,7 @@ const Editor = () => {
 
   // Удалить фон
   const handleDeleteBackground = (bgId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       backgrounds: prev.backgrounds.filter(b => b.id !== bgId),
     }));
@@ -224,7 +284,7 @@ const Editor = () => {
 
   // Добавить аудио
   const handleAddAudio = (audio: AudioAsset) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       audio: [...prev.audio, audio],
     }));
@@ -232,7 +292,7 @@ const Editor = () => {
 
   // Обновить аудио
   const handleUpdateAudio = (audioId: UUID, updates: Partial<AudioAsset>) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       audio: prev.audio.map(a =>
         a.id === audioId ? { ...a, ...updates } : a
@@ -242,7 +302,7 @@ const Editor = () => {
 
   // Удалить аудио
   const handleDeleteAudio = (audioId: UUID) => {
-    setNovel(prev => ({
+    updateNovel(prev => ({
       ...prev,
       audio: prev.audio.filter(a => a.id !== audioId),
     }));
@@ -279,6 +339,21 @@ const Editor = () => {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSave}
+              className={hasUnsavedChanges ? 'border-yellow-500' : ''}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {hasUnsavedChanges ? 'Сохранить*' : 'Сохранено'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
           
           <Link to="/">
             <Button size="sm">
