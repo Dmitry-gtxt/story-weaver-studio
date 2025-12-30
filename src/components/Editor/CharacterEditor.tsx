@@ -33,6 +33,7 @@ interface CharacterEditorProps {
   onDeleteCharacter: (characterId: UUID) => void;
   onAddSprite: (characterId: UUID, sprite: CharacterSprite) => void;
   onDeleteSprite: (characterId: UUID, spriteId: UUID) => void;
+  onUpdateSprite: (characterId: UUID, spriteId: UUID, updates: Partial<CharacterSprite>) => Promise<boolean>;
   generateId: () => UUID;
   userId: string;
 }
@@ -44,6 +45,7 @@ export const CharacterEditor = ({
   onDeleteCharacter,
   onAddSprite,
   onDeleteSprite,
+  onUpdateSprite,
   generateId,
   userId,
 }: CharacterEditorProps) => {
@@ -87,13 +89,11 @@ export const CharacterEditor = ({
     try {
       const imageUrl = await uploadFile(userId, file, 'image');
       if (imageUrl) {
-        const character = characters.find(c => c.id === characterId);
-        if (character) {
-          const updatedSprites = character.sprites.map(s =>
-            s.id === spriteId ? { ...s, imageUrl } : s
-          );
-          onUpdateCharacter(characterId, { sprites: updatedSprites });
+        const success = await onUpdateSprite(characterId, spriteId, { imageUrl });
+        if (success) {
           toast({ title: 'Изображение загружено' });
+        } else {
+          toast({ title: 'Ошибка сохранения', variant: 'destructive' });
         }
       } else {
         toast({ title: 'Ошибка загрузки', variant: 'destructive' });
