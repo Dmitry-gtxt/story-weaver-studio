@@ -46,6 +46,12 @@ export const mockNovel: Novel = {
           name: 'Встреча',
           nodes: [
             {
+              id: 'node-bg-1',
+              type: 'background',
+              backgroundId: 'bg-1',
+              transition: 'fade',
+            },
+            {
               id: 'node-0',
               type: 'character',
               characterId: 'char-1',
@@ -116,6 +122,12 @@ export const mockNovel: Novel = {
           name: 'На кухне',
           nodes: [
             {
+              id: 'node-s2-bg',
+              type: 'background',
+              backgroundId: 'bg-2',
+              transition: 'fade',
+            },
+            {
               id: 'node-s2-0',
               type: 'character',
               characterId: 'char-1',
@@ -161,6 +173,12 @@ export const mockNovel: Novel = {
           id: 'scene-3',
           name: 'Снова в кровати',
           nodes: [
+            {
+              id: 'node-s3-bg',
+              type: 'background',
+              backgroundId: 'bg-1',
+              transition: 'instant',
+            },
             {
               id: 'node-s3-0',
               type: 'character',
