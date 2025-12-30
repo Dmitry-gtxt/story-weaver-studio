@@ -162,6 +162,22 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters([]);
   };
 
+  // Автоматически показать персонажа при его диалоге (если его ещё нет на экране)
+  const ensureCharacterOnScreen = (characterId: string, emotion?: string) => {
+    setOnScreenCharacters(prev => {
+      const existing = prev.find(c => c.characterId === characterId);
+      if (existing) {
+        // Обновить эмоцию если указана
+        if (emotion && existing.emotion !== emotion) {
+          return prev.map(c => c.characterId === characterId ? { ...c, emotion } : c);
+        }
+        return prev;
+      }
+      // Добавить персонажа в центр по умолчанию
+      return [...prev, { characterId, position: 'center' as CharacterPosition, emotion }];
+    });
+  };
+
   // Перейти к следующему узлу
   const handleNext = () => {
     // Если текст ещё печатается — показать весь текст
@@ -190,6 +206,11 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         setTimeout(() => handleNext(), 50);
       } else if (nextNode.type === 'jump') {
         processJumpNode(nextNode as JumpNode);
+      } else if (nextNode.type === 'dialogue') {
+        // Автоматически показать персонажа при его диалоге
+        const dialogueNode = nextNode as DialogueNode;
+        ensureCharacterOnScreen(dialogueNode.characterId, dialogueNode.emotion);
+        setCurrentNodeIndex(nextIndex);
       } else {
         setCurrentNodeIndex(nextIndex);
       }
@@ -271,6 +292,16 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
           break;
         }
       }
+      
+      // Если первый текстовый нод — диалог, показать персонажа
+      if (idx < currentScene.nodes.length) {
+        const firstTextNode = currentScene.nodes[idx];
+        if (firstTextNode.type === 'dialogue') {
+          const dialogueNode = firstTextNode as DialogueNode;
+          ensureCharacterOnScreen(dialogueNode.characterId, dialogueNode.emotion);
+        }
+      }
+      
       if (idx > 0 && idx < currentScene.nodes.length) {
         setCurrentNodeIndex(idx);
       } else if (idx >= currentScene.nodes.length) {
