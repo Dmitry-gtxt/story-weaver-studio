@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode } from '@/types/novel';
+import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 
@@ -15,10 +15,20 @@ interface OnScreenCharacter {
   emotion?: string;
 }
 
+// Градиенты-заглушки для разных фонов
+const BACKGROUND_GRADIENTS: Record<string, string> = {
+  'bg-1': 'linear-gradient(to bottom, hsl(220 40% 30%), hsl(220 50% 20%))', // Комната - тёмно-синий
+  'bg-2': 'linear-gradient(to bottom, hsl(40 60% 70%), hsl(30 50% 50%))', // Кухня - тёплый
+  'bg-3': 'linear-gradient(to bottom, hsl(200 80% 70%), hsl(200 60% 40%))', // Улица - голубой
+};
+
+const DEFAULT_GRADIENT = 'linear-gradient(to bottom, hsl(220 20% 20%), hsl(220 30% 10%))';
+
 export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   const [currentSceneId, setCurrentSceneId] = useState(novel.startSceneId);
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
   const [onScreenCharacters, setOnScreenCharacters] = useState<OnScreenCharacter[]>([]);
+  const [currentBackgroundId, setCurrentBackgroundId] = useState<string | null>(null);
 
   // Найти текущую сцену
   const currentScene = useMemo((): Scene | undefined => {
@@ -34,6 +44,14 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   // Получить персонажа по ID
   const getCharacter = (characterId: string) => {
     return novel.characters.find(c => c.id === characterId);
+  };
+
+  // Получить градиент фона
+  const getBackgroundStyle = () => {
+    if (currentBackgroundId && BACKGROUND_GRADIENTS[currentBackgroundId]) {
+      return BACKGROUND_GRADIENTS[currentBackgroundId];
+    }
+    return DEFAULT_GRADIENT;
   };
 
   // Обработка узла 'character'
@@ -68,6 +86,11 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     });
   };
 
+  // Обработка узла 'background'
+  const processBackgroundNode = (node: BackgroundNode) => {
+    setCurrentBackgroundId(node.backgroundId);
+  };
+
   // Перейти к следующему узлу
   const handleNext = () => {
     if (!currentScene) return;
@@ -78,6 +101,10 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
       
       if (nextNode.type === 'character') {
         processCharacterNode(nextNode as CharacterNode);
+        setCurrentNodeIndex(nextIndex);
+        setTimeout(() => handleNext(), 50);
+      } else if (nextNode.type === 'background') {
+        processBackgroundNode(nextNode as BackgroundNode);
         setCurrentNodeIndex(nextIndex);
         setTimeout(() => handleNext(), 50);
       } else {
@@ -93,13 +120,21 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters([]);
   };
 
-  // Обработать начальные узлы типа character
+  // Обработать начальные узлы типа character и background
   useEffect(() => {
     if (currentScene && currentNodeIndex === 0) {
       let idx = 0;
-      while (idx < currentScene.nodes.length && currentScene.nodes[idx].type === 'character') {
-        processCharacterNode(currentScene.nodes[idx] as CharacterNode);
-        idx++;
+      while (idx < currentScene.nodes.length) {
+        const node = currentScene.nodes[idx];
+        if (node.type === 'character') {
+          processCharacterNode(node as CharacterNode);
+          idx++;
+        } else if (node.type === 'background') {
+          processBackgroundNode(node as BackgroundNode);
+          idx++;
+        } else {
+          break;
+        }
       }
       if (idx > 0) {
         setCurrentNodeIndex(idx);
@@ -179,7 +214,10 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* Фон */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-900" />
+      <div 
+        className="absolute inset-0 transition-all duration-500"
+        style={{ background: getBackgroundStyle() }}
+      />
       
       {/* Область персонажей */}
       <div className="absolute inset-x-0 bottom-48 top-16 flex items-end justify-center">
