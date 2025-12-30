@@ -62,6 +62,24 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     return novel.characters.find(c => c.id === characterId);
   };
 
+  // Получить спрайт персонажа по эмоции
+  const getCharacterSprite = (characterId: string, emotion?: string) => {
+    const char = getCharacter(characterId);
+    if (!char || char.sprites.length === 0) return null;
+    
+    // Ищем спрайт по эмоции
+    if (emotion) {
+      const sprite = char.sprites.find(s => s.emotion === emotion);
+      if (sprite?.imageUrl && sprite.imageUrl !== '/placeholder.svg') {
+        return sprite.imageUrl;
+      }
+    }
+    
+    // Fallback: первый спрайт с реальным URL
+    const firstValidSprite = char.sprites.find(s => s.imageUrl && s.imageUrl !== '/placeholder.svg');
+    return firstValidSprite?.imageUrl || null;
+  };
+
   // Получить фон по ID
   const getBackground = (backgroundId: string) => {
     return novel.backgrounds.find(b => b.id === backgroundId);
@@ -362,72 +380,99 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
       <div className="absolute inset-x-0 bottom-48 top-16 flex items-end justify-center">
         <div className="relative w-full max-w-5xl h-full flex items-end px-8">
           {/* Left position */}
-          <div className="absolute left-8 bottom-0 w-32">
+          <div className="absolute left-8 bottom-0">
             {onScreenCharacters.filter(c => c.position === 'left').map(({ characterId, emotion }) => {
               const char = getCharacter(characterId);
               if (!char) return null;
+              const spriteUrl = getCharacterSprite(characterId, emotion);
+              
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300"
+                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
                 >
-                  <div 
-                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
-                    style={{ backgroundColor: `hsl(${char.color})` }}
-                  >
-                    <span className="rotate-0 text-center px-2">
-                      {char.displayName}
-                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
-                    </span>
-                  </div>
+                  {spriteUrl ? (
+                    <img 
+                      src={spriteUrl} 
+                      alt={char.displayName}
+                      className="max-h-[60vh] w-auto object-contain drop-shadow-lg"
+                    />
+                  ) : (
+                    <div 
+                      className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                      style={{ backgroundColor: `hsl(${char.color})` }}
+                    >
+                      <span className="text-center px-2">
+                        {char.displayName}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Center position */}
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-32">
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0">
             {onScreenCharacters.filter(c => c.position === 'center').map(({ characterId, emotion }) => {
               const char = getCharacter(characterId);
               if (!char) return null;
+              const spriteUrl = getCharacterSprite(characterId, emotion);
+              
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300"
+                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
                 >
-                  <div 
-                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
-                    style={{ backgroundColor: `hsl(${char.color})` }}
-                  >
-                    <span className="rotate-0 text-center px-2">
-                      {char.displayName}
-                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
-                    </span>
-                  </div>
+                  {spriteUrl ? (
+                    <img 
+                      src={spriteUrl} 
+                      alt={char.displayName}
+                      className="max-h-[60vh] w-auto object-contain drop-shadow-lg"
+                    />
+                  ) : (
+                    <div 
+                      className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                      style={{ backgroundColor: `hsl(${char.color})` }}
+                    >
+                      <span className="text-center px-2">
+                        {char.displayName}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Right position */}
-          <div className="absolute right-8 bottom-0 w-32">
+          <div className="absolute right-8 bottom-0">
             {onScreenCharacters.filter(c => c.position === 'right').map(({ characterId, emotion }) => {
               const char = getCharacter(characterId);
               if (!char) return null;
+              const spriteUrl = getCharacterSprite(characterId, emotion);
+              
               return (
                 <div
                   key={characterId}
-                  className="flex flex-col items-center transition-all duration-300"
+                  className="flex flex-col items-center transition-all duration-300 animate-fade-in"
                 >
-                  <div 
-                    className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
-                    style={{ backgroundColor: `hsl(${char.color})` }}
-                  >
-                    <span className="rotate-0 text-center px-2">
-                      {char.displayName}
-                      {emotion && <span className="block text-xs opacity-75">{emotion}</span>}
-                    </span>
-                  </div>
+                  {spriteUrl ? (
+                    <img 
+                      src={spriteUrl} 
+                      alt={char.displayName}
+                      className="max-h-[60vh] w-auto object-contain drop-shadow-lg"
+                    />
+                  ) : (
+                    <div 
+                      className="w-24 h-48 rounded-t-full flex items-center justify-center text-sm font-medium text-white shadow-lg"
+                      style={{ backgroundColor: `hsl(${char.color})` }}
+                    >
+                      <span className="text-center px-2">
+                        {char.displayName}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
