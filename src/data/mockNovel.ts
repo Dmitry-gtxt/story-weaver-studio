@@ -194,7 +194,12 @@ export const mockNovel: Novel = {
             {
               id: 'node-s2-4',
               type: 'narration',
-              text: 'День начался отлично. Конец демо.',
+              text: 'День начался отлично.',
+            },
+            {
+              id: 'node-s2-jump',
+              type: 'jump',
+              targetSceneId: 'scene-4',
             },
           ],
         },
@@ -231,7 +236,40 @@ export const mockNovel: Novel = {
             {
               id: 'node-s3-3',
               type: 'narration',
-              text: 'Она проспала до обеда. Конец демо.',
+              text: 'Она проспала до обеда.',
+            },
+            {
+              id: 'node-s3-jump',
+              type: 'jump',
+              targetSceneId: 'scene-4',
+            },
+          ],
+        },
+        {
+          id: 'scene-4',
+          name: 'Эпилог',
+          nodes: [
+            {
+              id: 'node-s4-bg',
+              type: 'background',
+              backgroundId: 'bg-3',
+              transition: 'fade',
+            },
+            {
+              id: 'node-s4-audio',
+              type: 'audio',
+              audioId: 'audio-bgm-1',
+              action: 'fade-out',
+            },
+            {
+              id: 'node-s4-1',
+              type: 'narration',
+              text: 'Так закончилось это утро. Что будет дальше — покажет время...',
+            },
+            {
+              id: 'node-s4-2',
+              type: 'narration',
+              text: 'Конец демо.',
             },
           ],
         },
