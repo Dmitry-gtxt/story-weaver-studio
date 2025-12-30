@@ -34,7 +34,12 @@ export const mockNovel: Novel = {
     { id: 'bg-3', name: 'Улица', imageUrl: '' },
   ],
   
-  audio: [],
+  audio: [
+    { id: 'audio-bgm-1', name: 'Спокойная мелодия', type: 'bgm', audioUrl: '' },
+    { id: 'audio-bgm-2', name: 'Весёлая мелодия', type: 'bgm', audioUrl: '' },
+    { id: 'audio-sfx-knock', name: 'Стук в дверь', type: 'sfx', audioUrl: '' },
+    { id: 'audio-sfx-alarm', name: 'Будильник', type: 'sfx', audioUrl: '' },
+  ],
   
   chapters: [
     {
@@ -52,12 +57,24 @@ export const mockNovel: Novel = {
               transition: 'fade',
             },
             {
+              id: 'node-audio-1',
+              type: 'audio',
+              audioId: 'audio-bgm-1',
+              action: 'play',
+            },
+            {
               id: 'node-0',
               type: 'character',
               characterId: 'char-1',
               action: 'enter',
               position: 'center',
               emotion: 'neutral',
+            },
+            {
+              id: 'node-sfx-alarm',
+              type: 'audio',
+              audioId: 'audio-sfx-alarm',
+              action: 'play',
             },
             {
               id: 'node-1',
@@ -70,6 +87,12 @@ export const mockNovel: Novel = {
               characterId: 'char-1',
               emotion: 'neutral',
               text: 'Уже утро? Не хочу вставать...',
+            },
+            {
+              id: 'node-sfx-knock',
+              type: 'audio',
+              audioId: 'audio-sfx-knock',
+              action: 'play',
             },
             {
               id: 'node-3',
@@ -126,6 +149,12 @@ export const mockNovel: Novel = {
               type: 'background',
               backgroundId: 'bg-2',
               transition: 'fade',
+            },
+            {
+              id: 'node-s2-audio',
+              type: 'audio',
+              audioId: 'audio-bgm-2',
+              action: 'play',
             },
             {
               id: 'node-s2-0',

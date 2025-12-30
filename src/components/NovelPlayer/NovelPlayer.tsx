@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode } from '@/types/novel';
+import { Novel, Scene, SceneNode, DialogueNode, NarrationNode, CharacterNode, ChoiceNode, BackgroundNode, AudioNode } from '@/types/novel';
 import { Button } from '@/components/ui/button';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Volume2 } from 'lucide-react';
+import { useAudioManager } from '@/hooks/useAudioManager';
 
 interface NovelPlayerProps {
   novel: Novel;
@@ -29,6 +30,9 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
   const [onScreenCharacters, setOnScreenCharacters] = useState<OnScreenCharacter[]>([]);
   const [currentBackgroundId, setCurrentBackgroundId] = useState<string | null>(null);
+
+  // Аудио менеджер
+  const { playBgm, stopBgm, fadeOutBgm, playSfx, getCurrentBgmId } = useAudioManager(novel.audio);
 
   // Найти текущую сцену
   const currentScene = useMemo((): Scene | undefined => {
@@ -91,6 +95,28 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setCurrentBackgroundId(node.backgroundId);
   };
 
+  // Обработка узла 'audio'
+  const processAudioNode = (node: AudioNode) => {
+    const audioAsset = novel.audio.find(a => a.id === node.audioId);
+    if (!audioAsset) return;
+
+    if (audioAsset.type === 'bgm') {
+      switch (node.action) {
+        case 'play':
+          playBgm(node.audioId);
+          break;
+        case 'stop':
+          stopBgm();
+          break;
+        case 'fade-out':
+          fadeOutBgm();
+          break;
+      }
+    } else if (audioAsset.type === 'sfx' && node.action === 'play') {
+      playSfx(node.audioId);
+    }
+  };
+
   // Перейти к следующему узлу
   const handleNext = () => {
     if (!currentScene) return;
@@ -107,6 +133,10 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         processBackgroundNode(nextNode as BackgroundNode);
         setCurrentNodeIndex(nextIndex);
         setTimeout(() => handleNext(), 50);
+      } else if (nextNode.type === 'audio') {
+        processAudioNode(nextNode as AudioNode);
+        setCurrentNodeIndex(nextIndex);
+        setTimeout(() => handleNext(), 50);
       } else {
         setCurrentNodeIndex(nextIndex);
       }
@@ -120,7 +150,7 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
     setOnScreenCharacters([]);
   };
 
-  // Обработать начальные узлы типа character и background
+  // Обработать начальные узлы типа character, background и audio
   useEffect(() => {
     if (currentScene && currentNodeIndex === 0) {
       let idx = 0;
@@ -131,6 +161,9 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
           idx++;
         } else if (node.type === 'background') {
           processBackgroundNode(node as BackgroundNode);
+          idx++;
+        } else if (node.type === 'audio') {
+          processAudioNode(node as AudioNode);
           idx++;
         } else {
           break;
@@ -334,9 +367,12 @@ export const NovelPlayer = ({ novel }: NovelPlayerProps) => {
         </div>
       </div>
 
-      {/* Заголовок сцены */}
-      <div className="absolute top-4 left-4 text-sm text-muted-foreground/50">
-        {currentScene.name}
+      {/* Заголовок сцены и индикатор звука */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground/50">
+        <span>{currentScene.name}</span>
+        {getCurrentBgmId() && (
+          <Volume2 className="h-4 w-4 animate-pulse" />
+        )}
       </div>
     </div>
   );
