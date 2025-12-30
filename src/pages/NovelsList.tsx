@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getUserNovels, createNovel, deleteNovel } from '@/lib/novelApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, BookOpen, Trash2, Edit, LogOut, Loader2 } from 'lucide-react';
+import { Plus, BookOpen, Trash2, Edit, LogOut, Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -154,7 +154,16 @@ const NovelsList = () => {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => navigate(`/play/${novel.id}`)}
+                        title="Играть"
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => navigate(`/editor/${novel.id}`)}
+                        title="Редактировать"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
